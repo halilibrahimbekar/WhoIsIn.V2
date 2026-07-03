@@ -1,0 +1,6 @@
+@WhoIsInV2.Api_HostAddress = http://localhost:5032
+
+GET {{WhoIsInV2.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WhoIsInV2.Api/WhoIsInV2.Api.csproj" />
+    <Project Path="src/WhoIsInV2.Application/WhoIsInV2.Application.csproj" />
+    <Project Path="src/WhoIsInV2.Domain/WhoIsInV2.Domain.csproj" />
+    <Project Path="src/WhoIsInV2.Infrastructure/WhoIsInV2.Infrastructure.csproj" />
+  </Folder>
+</Solution>
