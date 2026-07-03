@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import { clearAuthSession, persistAuthTokens, persistStoredUser } from '../auth/session'
+import { clearAuthSession, getRefreshToken, persistAuthTokens, persistStoredUser } from '../auth/session'
 
 export interface LoginRequest {
   email: string
@@ -59,4 +59,24 @@ export async function getCurrentUser(): Promise<CurrentUserResponse> {
   }
 
   return (await response.json()) as CurrentUserResponse
+}
+
+export async function revokeCurrentSession(): Promise<void> {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) {
+    return
+  }
+
+  try {
+    await apiFetch('/api/auth/revoke', {
+      withAuth: false,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    })
+  } catch {
+    // Ignore network errors on logout; local session will still be cleared.
+  }
 }

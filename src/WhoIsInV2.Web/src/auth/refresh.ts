@@ -1,4 +1,5 @@
 import type { CurrentUserResponse } from '../api/auth'
+import { API_BASE_URL } from '../api/config'
 import {
   clearAuthSession,
   getRefreshToken,
@@ -13,8 +14,6 @@ interface RefreshResponse {
   refreshTokenExpiresAtUtc: string
   user: CurrentUserResponse
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5032'
 
 let inFlightRefresh: Promise<boolean> | null = null
 

@@ -1,7 +1,6 @@
 import { getAccessToken } from '../auth/session'
 import { tryRefreshAccessToken } from '../auth/refresh'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5032'
+import { API_BASE_URL } from './config'
 
 interface ApiFetchOptions extends RequestInit {
   withAuth?: boolean

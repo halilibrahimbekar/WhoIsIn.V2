@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { getCurrentUser, type AuthTokenResponse, type CurrentUserResponse } from '../api/auth'
+import {
+  getCurrentUser,
+  revokeCurrentSession,
+  type AuthTokenResponse,
+  type CurrentUserResponse,
+} from '../api/auth'
 import {
   clearAuthSession,
   hasAccessToken,
@@ -12,7 +17,7 @@ interface AuthContextValue {
   user: CurrentUserResponse | null
   isInitializing: boolean
   signIn: (payload: AuthTokenResponse) => void
-  signOut: () => void
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -69,7 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persistStoredUser(payload.user)
         setUser(payload.user)
       },
-      signOut: () => {
+      signOut: async () => {
+        await revokeCurrentSession()
         clearAuthSession()
         setUser(null)
       },

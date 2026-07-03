@@ -34,7 +34,7 @@ export function AppLayout() {
 
         <div className="sidebar-footer">
           <p className="user-chip">{user?.firstName} {user?.lastName}</p>
-          <button type="button" className="signout-btn" onClick={signOut}>
+          <button type="button" className="signout-btn" onClick={() => void signOut()}>
             Sign out
           </button>
         </div>
