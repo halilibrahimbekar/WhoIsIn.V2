@@ -2,9 +2,9 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/events', label: 'Events' },
-  { to: '/invites', label: 'Invites' },
+  { to: '/app', label: 'Dashboard', end: true },
+  { to: '/app/events', label: 'Events' },
+  { to: '/app/invites', label: 'Invites' },
 ]
 
 export function AppLayout() {

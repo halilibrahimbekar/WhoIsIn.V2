@@ -6,6 +6,13 @@ export interface LoginRequest {
   password: string
 }
 
+export interface RegisterRequest {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+}
+
 export interface CurrentUserResponse {
   id: string
   email: string
@@ -35,6 +42,24 @@ export async function login(request: LoginRequest): Promise<AuthTokenResponse> {
   if (!response.ok) {
     const errorText = await response.text()
     throw new Error(errorText || 'Login request failed.')
+  }
+
+  return (await response.json()) as AuthTokenResponse
+}
+
+export async function register(request: RegisterRequest): Promise<AuthTokenResponse> {
+  const response = await apiFetch('/api/auth/register', {
+    withAuth: false,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || 'Register request failed.')
   }
 
   return (await response.json()) as AuthTokenResponse

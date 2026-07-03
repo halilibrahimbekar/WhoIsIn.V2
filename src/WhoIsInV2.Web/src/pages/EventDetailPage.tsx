@@ -23,7 +23,7 @@ export function EventDetailPage() {
         <article className="detail-card">
           <h2>Actions</h2>
           <p>Invite guests, update status, promote waitlist participants.</p>
-          <Link to="/invites">Go to invites</Link>
+          <Link to="/app/invites">Go to invites</Link>
         </article>
       </div>
     </section>

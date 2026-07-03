@@ -65,7 +65,7 @@ export function DashboardPage() {
       <section className="board" aria-label="Upcoming events">
         <div className="board-header">
           <h2>Upcoming Events</h2>
-          <Link to="/events">See all</Link>
+          <Link to="/app/events">See all</Link>
         </div>
         <div className="event-list">
           {upcomingEvents.map((event) => (

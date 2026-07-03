@@ -32,6 +32,7 @@ Durumlar:
 | M1-06 | Auth session bootstrap ve route guard | DONE | Authorization header wrapper, `/api/auth/me` ile acilis kontrolu ve korumali rotalar eklendi |
 | M1-07 | FE otomatik access token yenileme | DONE | 401 durumunda `/api/auth/refresh` ile token yenileme ve istek tekrar deneme eklendi |
 | M1-08 | Logout server-side token revoke | DONE | Cikis aksiyonunda `/api/auth/revoke` cagrisi ve sonrasinda local session temizligi eklendi |
+| M1-09 | Landing page + register yonlendirmesi | DONE | Ana sayfa landing olarak degisti, register formu eklendi ve uygulama paneli `/app` altina tasindi |
 
 ## Yakindaki Sonraki Adimlar
 1. Auth gerektiren endpointlerde sahiplik/rol kontrolunu detaylandir.
@@ -48,6 +49,7 @@ Durumlar:
 - 2026-07-03: M1-06 tamamlandi, uygulama acilisinda `/api/auth/me` ile oturum dogrulama ve route guard eklendi.
 - 2026-07-03: M1-07 tamamlandi, 401 sonrasinda refresh token ile otomatik access token yenileme eklendi.
 - 2026-07-03: M1-08 tamamlandi, logout sirasinda backend revoke endpoint cagrisi eklendi.
+- 2026-07-03: M1-09 tamamlandi, landing page ana sayfa yapildi; register formu eklendi ve dashboard rotalari `/app` altina tasindi.
 - 2026-07-03: M0-08 tamamlandi, `dotnet ef database update` basariyla calisti.
 - 2026-07-03: M0-08 denemesi yapildi, PostgreSQL auth hatasi (28P01) nedeniyle bloklandi.
 - 2026-07-03: M0-07 tamamlandi, `InitialCreate` migration'i olusturuldu.

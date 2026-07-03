@@ -22,7 +22,7 @@ export function AuthPage() {
       const response = await login({ email, password })
       persistAuthSession(response)
       signIn(response)
-      navigate('/')
+      navigate('/app')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected login error.'
       setErrorMessage(message)
@@ -67,7 +67,7 @@ export function AuthPage() {
           </button>
         </form>
 
-        <Link to="/">Back to dashboard</Link>
+        <Link to="/#register">Create an account</Link>
       </div>
     </section>
   )

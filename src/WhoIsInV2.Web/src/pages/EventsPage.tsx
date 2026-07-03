@@ -56,7 +56,7 @@ export function EventsPage() {
                 <td>{event.accepted}</td>
                 <td>{event.waitlist}</td>
                 <td>
-                  <Link to={`/events/${event.id}`}>Detail</Link>
+                  <Link to={`/app/events/${event.id}`}>Detail</Link>
                 </td>
               </tr>
             ))}
