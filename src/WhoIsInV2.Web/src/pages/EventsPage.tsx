@@ -1,68 +1,176 @@
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-
-const events = [
-  {
-    id: 'launch-meetup',
-    name: 'Product Launch Meetup',
-    date: '05 July, 19:00',
-    status: 'Published',
-    accepted: 120,
-    waitlist: 12,
-  },
-  {
-    id: 'frontend-night',
-    name: 'Frontend Community Night',
-    date: '08 July, 20:30',
-    status: 'Published',
-    accepted: 340,
-    waitlist: 41,
-  },
-  {
-    id: 'mvp-demo-day',
-    name: 'WhoIsIn MVP Demo Day',
-    date: '12 July, 18:00',
-    status: 'Draft',
-    accepted: 72,
-    waitlist: 0,
-  },
-]
+import { createEvent, getEvents, type EventListItem } from '../api/events'
 
 export function EventsPage() {
+  const [events, setEvents] = useState<EventListItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [title, setTitle] = useState('')
+  const [startAt, setStartAt] = useState('')
+  const [endAt, setEndAt] = useState('')
+  const [timeZone, setTimeZone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  const [capacity, setCapacity] = useState('50')
+  const [locationName, setLocationName] = useState('')
+  const [description, setDescription] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadEvents() {
+      try {
+        const response = await getEvents()
+        if (isMounted) {
+          setEvents(response)
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : 'Could not load events.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadEvents()
+
+    return () => {
+      isMounted = false
+    }
+  }, [refreshKey])
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setCreateError('')
+    setIsCreating(true)
+
+    try {
+      await createEvent({
+        title,
+        description: description || null,
+        category: null,
+        startAtUtc: new Date(startAt).toISOString(),
+        endAtUtc: endAt ? new Date(endAt).toISOString() : null,
+        timeZone,
+        locationName: locationName || null,
+        locationAddress: null,
+        onlineMeetingUrl: null,
+        capacity: Number(capacity),
+      })
+      setTitle('')
+      setStartAt('')
+      setEndAt('')
+      setCapacity('50')
+      setLocationName('')
+      setDescription('')
+      setIsCreateOpen(false)
+      setRefreshKey((value) => value + 1)
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not create event.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   return (
     <section className="content-page">
       <header className="content-header">
         <h1>Events</h1>
         <p>Review current statuses and jump into event details.</p>
+        <button type="button" className="primary-btn" onClick={() => setIsCreateOpen((value) => !value)}>
+          {isCreateOpen ? 'Close' : 'Create Event'}
+        </button>
       </header>
 
+      {isCreateOpen && (
+        <form className="auth-form table-card" onSubmit={handleCreate}>
+          <h2>Create event</h2>
+          <label>
+            Title
+            <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+          </label>
+          <label>
+            Description
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
+          </label>
+          <label>
+            Starts
+            <input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} required />
+          </label>
+          <label>
+            Ends
+            <input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} />
+          </label>
+          <label>
+            Time zone
+            <input value={timeZone} onChange={(event) => setTimeZone(event.target.value)} required />
+          </label>
+          <label>
+            Capacity
+            <input type="number" min="1" value={capacity} onChange={(event) => setCapacity(event.target.value)} required />
+          </label>
+          <label>
+            Location
+            <input value={locationName} onChange={(event) => setLocationName(event.target.value)} />
+          </label>
+          {createError && <p className="auth-error">{createError}</p>}
+          <button type="submit" className="primary-btn" disabled={isCreating}>
+            {isCreating ? 'Creating...' : 'Create event'}
+          </button>
+        </form>
+      )}
+
       <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Event</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Accepted</th>
-              <th>Waitlist</th>
-              <th>Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((event) => (
-              <tr key={event.id}>
-                <td>{event.name}</td>
-                <td>{event.date}</td>
-                <td>{event.status}</td>
-                <td>{event.accepted}</td>
-                <td>{event.waitlist}</td>
-                <td>
-                  <Link to={`/app/events/${event.id}`}>Detail</Link>
-                </td>
+        {isLoading && <p>Loading events...</p>}
+        {!isLoading && errorMessage && <p className="auth-error">{errorMessage}</p>}
+        {!isLoading && !errorMessage && events.length === 0 && <p>No events found.</p>}
+        {!isLoading && !errorMessage && events.length > 0 && (
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Capacity</th>
+                <th>Accepted</th>
+                <th>Waitlist</th>
+                <th>Open</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {events.map((event) => (
+                <tr key={event.id}>
+                  <td>{event.title}</td>
+                  <td>{formatEventDate(event.startAtUtc, event.endAtUtc)}</td>
+                  <td>{event.status}</td>
+                  <td>{event.capacity}</td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td>
+                    <Link to={`/app/events/${event.id}`}>Detail</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </section>
   )
+}
+
+function formatEventDate(startAtUtc: string, endAtUtc: string | null): string {
+  const start = new Date(startAtUtc).toLocaleString()
+  if (!endAtUtc) {
+    return start
+  }
+
+  return `${start} - ${new Date(endAtUtc).toLocaleTimeString()}`
 }

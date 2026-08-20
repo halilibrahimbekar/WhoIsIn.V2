@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Swashbuckle.AspNetCore.SwaggerUI;
 using WhoIsInV2.Api.Auth;
 using WhoIsInV2.Infrastructure;
 
@@ -64,15 +65,18 @@ try
 
     builder.Services.AddAuthorization();
 
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddOpenApi();
     builder.Services.AddInfrastructure(builder.Configuration);
 
     var app = builder.Build();
 
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        app.MapOpenApi();
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("openapi/v1.json", "WhosIn");
+        });
     }
 
     app.UseSerilogRequestLogging();

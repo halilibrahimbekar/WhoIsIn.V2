@@ -1,40 +1,48 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-
-const metrics = [
-  { label: 'Active events', value: '24' },
-  { label: 'Accepted guests', value: '1,482' },
-  { label: 'Waitlist', value: '91' },
-  { label: 'Fill rate', value: '83%' },
-]
-
-const upcomingEvents = [
-  {
-    id: 'launch-meetup',
-    title: 'Product Launch Meetup',
-    date: '05 July, 19:00',
-    venue: 'Karakoy Loft',
-    capacity: '120 / 160',
-    status: 'Published',
-  },
-  {
-    id: 'frontend-night',
-    title: 'Frontend Community Night',
-    date: '08 July, 20:30',
-    venue: 'Online - Zoom',
-    capacity: '340 / 400',
-    status: 'Published',
-  },
-  {
-    id: 'mvp-demo-day',
-    title: 'WhoIsIn MVP Demo Day',
-    date: '12 July, 18:00',
-    venue: 'Levent Hub',
-    capacity: '72 / 80',
-    status: 'Almost full',
-  },
-]
+import { getEventSummary, type EventSummary } from '../api/events'
 
 export function DashboardPage() {
+  const [summary, setSummary] = useState<EventSummary | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadSummary() {
+      try {
+        const response = await getEventSummary()
+        if (isMounted) {
+          setSummary(response)
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : 'Could not load dashboard.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadSummary()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const metrics = summary
+    ? [
+        { label: 'Active events', value: summary.activeEventCount.toLocaleString() },
+        { label: 'Accepted guests', value: summary.acceptedGuestCount.toLocaleString() },
+        { label: 'Waitlist', value: summary.waitlistCount.toLocaleString() },
+        { label: 'Fill rate', value: `${summary.fillRate}%` },
+      ]
+    : []
+
   return (
     <section className="page-shell">
       <header className="hero">
@@ -43,18 +51,12 @@ export function DashboardPage() {
         <p className="subtitle">
           The organizer dashboard surfaces the next bottleneck before your event day gets messy.
         </p>
-        <div className="hero-actions">
-          <button type="button" className="primary-btn">
-            Create Event
-          </button>
-          <button type="button" className="ghost-btn">
-            Load Demo Data
-          </button>
-        </div>
       </header>
 
       <section className="metric-grid" aria-label="Summary metrics">
-        {metrics.map((item) => (
+        {isLoading && <p>Loading dashboard...</p>}
+        {!isLoading && errorMessage && <p className="auth-error">{errorMessage}</p>}
+        {!isLoading && !errorMessage && metrics.map((item) => (
           <article className="metric-card" key={item.label}>
             <p>{item.label}</p>
             <strong>{item.value}</strong>
@@ -68,17 +70,18 @@ export function DashboardPage() {
           <Link to="/app/events">See all</Link>
         </div>
         <div className="event-list">
-          {upcomingEvents.map((event) => (
+          {!isLoading && !errorMessage && summary?.upcomingEvents.length === 0 && <p>No upcoming events.</p>}
+          {summary?.upcomingEvents.map((event) => (
             <article className="event-card" key={event.id}>
               <div>
                 <p className="event-title">{event.title}</p>
                 <p className="event-meta">
-                  {event.date} | {event.venue}
+                  {formatEventDate(event.startAtUtc, event.endAtUtc)} | {event.locationName || event.onlineMeetingUrl || 'Online'}
                 </p>
               </div>
               <div className="event-side">
-                <p>{event.capacity}</p>
-                <span>{event.status}</span>
+                <p>{event.acceptedCount} / {event.capacity}</p>
+                <span>{event.status} | {event.waitlistCount} waitlisted</span>
               </div>
             </article>
           ))}
@@ -86,4 +89,9 @@ export function DashboardPage() {
       </section>
     </section>
   )
+}
+
+function formatEventDate(startAtUtc: string, endAtUtc: string | null): string {
+  const start = new Date(startAtUtc).toLocaleString()
+  return endAtUtc ? `${start} - ${new Date(endAtUtc).toLocaleTimeString()}` : start
 }
