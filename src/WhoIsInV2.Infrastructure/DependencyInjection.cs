@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using WhoIsInV2.Application.Common.Interfaces;
 using WhoIsInV2.Infrastructure.Persistence;
 
 namespace WhoIsInV2.Infrastructure;
@@ -14,6 +15,7 @@ public static class DependencyInjection
 
         services.AddDbContext<WhoIsInV2DbContext>(options =>
             options.UseNpgsql(connectionString));
+        services.AddScoped<IWhoIsInV2DbContext>(provider => provider.GetRequiredService<WhoIsInV2DbContext>());
 
         return services;
     }

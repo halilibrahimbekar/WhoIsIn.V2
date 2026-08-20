@@ -4,73 +4,30 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using WhoIsInV2.Application.Common.Interfaces;
 using WhoIsInV2.Domain.Entities;
 
 namespace WhoIsInV2.Api.Auth;
 
-public interface IJwtTokenService
+public sealed class JwtTokenService(IOptions<JwtOptions> options) : IAccessTokenService
 {
-    TokenPair GenerateTokenPair(User user);
-    string ComputeTokenHash(string token);
-}
+    private readonly JwtOptions _options = options.Value;
 
-public sealed class JwtTokenService : IJwtTokenService
-{
-    private readonly JwtOptions _options;
-
-    public JwtTokenService(IOptions<JwtOptions> options)
-    {
-        _options = options.Value;
-    }
-
-    public TokenPair GenerateTokenPair(User user)
+    public AccessTokenPair GenerateTokenPair(User user)
     {
         var now = DateTime.UtcNow;
         var accessTokenExpiresAtUtc = now.AddMinutes(_options.AccessTokenMinutes);
         var refreshTokenExpiresAtUtc = now.AddDays(_options.RefreshTokenDays);
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email),
-            new(JwtRegisteredClaimNames.GivenName, user.FirstName),
-            new(JwtRegisteredClaimNames.FamilyName, user.LastName),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.GivenName, user.FirstName), new(JwtRegisteredClaimNames.FamilyName, user.LastName), new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
-
-        var jwt = new JwtSecurityToken(
-            issuer: _options.Issuer,
-            audience: _options.Audience,
-            claims: claims,
-            notBefore: now,
-            expires: accessTokenExpiresAtUtc,
-            signingCredentials: creds);
-
-        var accessToken = new JwtSecurityTokenHandler().WriteToken(jwt);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var token = new JwtSecurityToken(_options.Issuer, _options.Audience, claims, now, accessTokenExpiresAtUtc, new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-
-        return new TokenPair(
-            accessToken,
-            accessTokenExpiresAtUtc,
-            refreshToken,
-            refreshTokenExpiresAtUtc,
-            ComputeTokenHash(refreshToken));
+        return new AccessTokenPair(new JwtSecurityTokenHandler().WriteToken(token), accessTokenExpiresAtUtc, refreshToken, refreshTokenExpiresAtUtc, ComputeTokenHash(refreshToken));
     }
 
-    public string ComputeTokenHash(string token)
-    {
-        var bytes = Encoding.UTF8.GetBytes(token);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash);
-    }
+    public string ComputeTokenHash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }
-
-public sealed record TokenPair(
-    string AccessToken,
-    DateTime AccessTokenExpiresAtUtc,
-    string RefreshToken,
-    DateTime RefreshTokenExpiresAtUtc,
-    string RefreshTokenHash);

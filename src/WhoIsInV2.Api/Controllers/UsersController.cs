@@ -1,83 +1,38 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WhoIsInV2.Domain.Entities;
-using WhoIsInV2.Infrastructure.Persistence;
+using WhoIsInV2.Application.Users;
 
 namespace WhoIsInV2.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
-public class UsersController : ControllerBase
+public class UsersController(IUserService userService) : ControllerBase
 {
-    private readonly WhoIsInV2DbContext _dbContext;
-
-    public UsersController(WhoIsInV2DbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<UserListItemResponse>>> GetAll(CancellationToken cancellationToken)
     {
-        var users = await _dbContext.Users
-            .AsNoTracking()
-            .OrderBy(x => x.Email)
-            .Select(x => new UserListItemResponse(x.Id, x.Email, x.FirstName, x.LastName, x.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
-
-        return Ok(users);
+        var users = await userService.GetAllAsync(cancellationToken);
+        return Ok(users.Select(user => new UserListItemResponse(user.Id, user.Email, user.FirstName, user.LastName, user.CreatedAtUtc)).ToArray());
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<UserDetailResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var user = await _dbContext.Users
-            .AsNoTracking()
-            .Where(x => x.Id == id)
-            .Select(x => new UserDetailResponse(x.Id, x.Email, x.FirstName, x.LastName, x.CreatedAtUtc))
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (user is null)
-        {
-            return NotFound();
-        }
-
-        return Ok(user);
+        var user = await userService.GetByIdAsync(id, cancellationToken);
+        return user is null ? NotFound() : Ok(ToResponse(user));
     }
 
     [HttpPost]
-    public async Task<ActionResult<UserDetailResponse>> Create([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<UserDetailResponse>> Create(CreateUserRequest request, CancellationToken cancellationToken)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-
-        var exists = await _dbContext.Users
-            .AnyAsync(x => x.Email == normalizedEmail, cancellationToken);
-
-        if (exists)
-        {
-            return Conflict("A user with this email already exists.");
-        }
-
-        var entity = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = normalizedEmail,
-            FirstName = request.FirstName.Trim(),
-            LastName = request.LastName.Trim(),
-            CreatedAtUtc = DateTime.UtcNow
-        };
-
-        _dbContext.Users.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        var response = new UserDetailResponse(entity.Id, entity.Email, entity.FirstName, entity.LastName, entity.CreatedAtUtc);
-
-        return CreatedAtAction(nameof(GetById), new { id = entity.Id }, response);
+        var result = await userService.CreateAsync(new CreateUserCommand(request.Email, request.FirstName, request.LastName), cancellationToken);
+        if (result.EmailExists) return Conflict("A user with this email already exists.");
+        var user = result.User!;
+        return CreatedAtAction(nameof(GetById), new { id = user.Id }, ToResponse(user));
     }
+
+    private static UserDetailResponse ToResponse(UserDetail user) => new(user.Id, user.Email, user.FirstName, user.LastName, user.CreatedAtUtc);
 }
 
 public sealed record CreateUserRequest(string Email, string FirstName, string LastName);
-
 public sealed record UserListItemResponse(Guid Id, string Email, string FirstName, string LastName, DateTime CreatedAtUtc);
-
 public sealed record UserDetailResponse(Guid Id, string Email, string FirstName, string LastName, DateTime CreatedAtUtc);

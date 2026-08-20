@@ -51,6 +51,7 @@ public class EventsController : ControllerBase
         var events = await _dbContext.Events
             .AsNoTracking()
             .Where(x => x.OrganizerId == currentUserId.Value)
+            .OrderBy(x => x.StartAtUtc)
             .Select(x => new EventSummaryItemResponse(
                 x.Id,
                 x.Title,
@@ -62,7 +63,6 @@ public class EventsController : ControllerBase
                 x.Status.ToString(),
                 x.Participants.Count(p => p.Status == ParticipantStatus.Confirmed),
                 x.Participants.Count(p => p.Status == ParticipantStatus.Waitlisted)))
-            .OrderBy(x => x.StartAtUtc)
             .ToListAsync(cancellationToken);
 
         var acceptedGuests = events.Sum(x => x.AcceptedCount);

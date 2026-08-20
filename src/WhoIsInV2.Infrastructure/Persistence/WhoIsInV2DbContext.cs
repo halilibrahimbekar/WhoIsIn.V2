@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using WhoIsInV2.Application.Common.Interfaces;
 using WhoIsInV2.Domain.Entities;
 
 namespace WhoIsInV2.Infrastructure.Persistence;
 
-public class WhoIsInV2DbContext : DbContext
+public class WhoIsInV2DbContext : DbContext, IWhoIsInV2DbContext
 {
     public WhoIsInV2DbContext(DbContextOptions<WhoIsInV2DbContext> options)
         : base(options)
