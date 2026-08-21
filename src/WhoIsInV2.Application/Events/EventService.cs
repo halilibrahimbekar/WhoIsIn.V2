@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-
 using System.Security.Cryptography;
+
+using Microsoft.EntityFrameworkCore;
 
 using WhoIsInV2.Application.Common.Interfaces;
 using WhoIsInV2.Domain.Entities;
@@ -97,7 +97,11 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
     public async Task<EventResult<EventDetail>> UpdateAsync(Guid organizerId, Guid id, EventCommand command, CancellationToken cancellationToken)
     {
         var validation = Validate(command, requireTitle: true);
-        if (validation is not null) return EventResult<EventDetail>.BadRequest(validation);
+        if (validation is not null)
+        {
+            return EventResult<EventDetail>.BadRequest(validation);
+        }
+
         if (!Enum.TryParse<EventVisibility>(command.Visibility, true, out var visibility)) return EventResult<EventDetail>.BadRequest("Invalid event visibility.");
         if (command.CategoryId is not null && !await dbContext.Categories.AnyAsync(item => item.Id == command.CategoryId, cancellationToken)) return EventResult<EventDetail>.BadRequest("Category was not found.");
         var entity = await dbContext.Events.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
