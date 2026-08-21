@@ -97,6 +97,7 @@ Asagidaki sira, API guvenligi ve veri kontratlari oturmadan web ekranlarinin tek
 7. Faz 2 Flutter mobil MVP'ye basla.
 
 ## Degisiklik Kaydi
+- 2026-08-21: Faz 2 Flutter mobil MVP baslatildi; `mobile/` altinda proje olusturuldu, auth/events/dashboard ozellikleri backend API'sine baglandi. Detaylar icin [MOBILE_PLAN.md](MOBILE_PLAN.md). `flutter analyze` temiz, `flutter build web --release` basarili.
 - 2026-08-21: RSVP butonlari mevcut duruma gore karsilikli tutuldu; Accepted davette Decline, Declined davette Accept, Pending/Waitlisted davette iki aksiyon da gorunuyor. Frontend build basarili.
 - 2026-08-21: Event kategorileri ayri `Categories` tablosuna tasindi; migration mevcut kategori metinlerini koruyup varsayilan secenekleri seed ediyor. Public/InviteOnly gorunurluk, organizer approval ve public RSVP akisiyla birlikte backend/web'e eklendi; veritabani migration'i uygulandi, solution ve frontend build basarili.
 - 2026-08-21: Davetli kullanicinin Invites ekraninda organizer-only 403 almasi duzeltildi; GET invites organizer icin tum kayitlari, davetli icin yalnizca kendi kaydini donduruyor. Backend build basarili.
