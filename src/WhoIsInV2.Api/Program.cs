@@ -6,6 +6,7 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 using WhoIsInV2.Api.Auth;
 using WhoIsInV2.Application.Authentication;
 using WhoIsInV2.Application.Common.Interfaces;
+using WhoIsInV2.Application.Events;
 using WhoIsInV2.Application.Users;
 using WhoIsInV2.Infrastructure;
 
@@ -22,6 +23,7 @@ try
     builder.Services.AddScoped<IAccessTokenService, JwtTokenService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddScoped<IEventService, EventService>();
 
     var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? throw new InvalidOperationException("Jwt settings are not configured.");
     if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Length < 32) throw new InvalidOperationException("Jwt signing key must be configured and at least 32 characters long.");

@@ -97,7 +97,7 @@ Asagidaki sira, API guvenligi ve veri kontratlari oturmadan web ekranlarinin tek
 7. Faz 2 Flutter mobil MVP'ye basla.
 
 ## Degisiklik Kaydi
-- 2026-08-20: Clean Architecture katmanlari etkinlestirilmeye baslandi. Auth ve Users endpointlerindeki veri erisimi ve use-case kurallari Application servislerine tasindi; API controllerlari HTTP adaptoru olarak sadeleştirildi. EventsController icin ayni tasima sonraki refactor adimi olarak acik kaldi.
+- 2026-08-20: Clean Architecture katmanlari etkinlestirilmeye baslandi. Auth, Users ve Events endpointlerindeki veri erisimi ve use-case kurallari Application servislerine tasindi; API controllerlari HTTP adaptoru olarak sadeleştirildi.
 - 2026-08-20: Swagger UI, ASP.NET Core `AddOpenApi`/`MapOpenApi` tarafindan uretilen `/openapi/v1.json` dokumanina acikca baglandi. Solution build basarili ve NU1903 guvenlik uyarisi gorulmedi.
 - 2026-08-20: RSVP aksiyonlari yalnizca oturum kullanicisinin kendi invite satirinda gosterildi; decline sonrasi waitlist promote sirasi duzeltildi. Frontend/backend build basarili.
 - 2026-08-20: Waitlist promote endpointi ve participant status/promote UI aksiyonlari eklendi; invite ekranina RSVP Accept/Decline akisina baglandi. Backend/frontend build basarili.
