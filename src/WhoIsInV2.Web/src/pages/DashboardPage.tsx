@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getEventSummary, type EventSummary } from '../api/events'
+import { getEventSummary, getEvents, type EventListItem, type EventSummary } from '../api/events'
 
 export function DashboardPage() {
   const [summary, setSummary] = useState<EventSummary | null>(null)
+  const [events, setEvents] = useState<EventListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -12,9 +13,10 @@ export function DashboardPage() {
 
     async function loadSummary() {
       try {
-        const response = await getEventSummary()
+        const [response, eventResponse] = await Promise.all([getEventSummary(), getEvents()])
         if (isMounted) {
           setSummary(response)
+          setEvents(eventResponse)
         }
       } catch (error) {
         if (isMounted) {
@@ -70,18 +72,18 @@ export function DashboardPage() {
           <Link to="/app/events">See all</Link>
         </div>
         <div className="event-list">
-          {!isLoading && !errorMessage && summary?.upcomingEvents.length === 0 && <p>No upcoming events.</p>}
-          {summary?.upcomingEvents.map((event) => (
+          {!isLoading && !errorMessage && events.length === 0 && <p>No upcoming events.</p>}
+          {events.map((event) => (
             <article className="event-card" key={event.id}>
               <div>
                 <p className="event-title">{event.title}</p>
                 <p className="event-meta">
-                  {formatEventDate(event.startAtUtc, event.endAtUtc)} | {event.locationName || event.onlineMeetingUrl || 'Online'}
+                  {formatEventDate(event.startAtUtc, event.endAtUtc)} | {event.categoryName || 'Event'} | {event.visibility}
                 </p>
               </div>
               <div className="event-side">
-                <p>{event.acceptedCount} / {event.capacity}</p>
-                <span>{event.status} | {event.waitlistCount} waitlisted</span>
+                <p>{event.capacity} places</p>
+                <span>{event.status}</span>
               </div>
             </article>
           ))}

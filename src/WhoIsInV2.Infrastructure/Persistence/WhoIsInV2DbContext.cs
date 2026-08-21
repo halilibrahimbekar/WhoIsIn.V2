@@ -12,6 +12,7 @@ public class WhoIsInV2DbContext : DbContext, IWhoIsInV2DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<Category> Categories => Set<Category>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<EventInvite> EventInvites => Set<EventInvite>();
     public DbSet<EventParticipant> EventParticipants => Set<EventParticipant>();
@@ -35,7 +36,7 @@ public class WhoIsInV2DbContext : DbContext, IWhoIsInV2DbContext
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Category).HasMaxLength(100);
+            entity.Property(x => x.Visibility).IsRequired();
             entity.Property(x => x.TimeZone).HasMaxLength(100).IsRequired();
             entity.Property(x => x.LocationName).HasMaxLength(200);
             entity.Property(x => x.LocationAddress).HasMaxLength(500);
@@ -45,6 +46,18 @@ public class WhoIsInV2DbContext : DbContext, IWhoIsInV2DbContext
                 .WithMany(x => x.OrganizedEvents)
                 .HasForeignKey(x => x.OrganizerId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Category)
+                .WithMany(x => x.Events)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            entity.HasIndex(x => x.Name).IsUnique();
         });
 
         modelBuilder.Entity<EventInvite>(entity =>

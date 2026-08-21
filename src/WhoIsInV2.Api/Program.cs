@@ -24,6 +24,7 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddScoped<IEventService, EventService>();
+    builder.Services.AddScoped<ICategoryService, CategoryService>();
 
     var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? throw new InvalidOperationException("Jwt settings are not configured.");
     if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Length < 32) throw new InvalidOperationException("Jwt signing key must be configured and at least 32 characters long.");

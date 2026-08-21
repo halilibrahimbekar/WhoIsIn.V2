@@ -29,11 +29,11 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
     {
         var userEmail = await GetUserEmailAsync(userId, cancellationToken);
         return await dbContext.Events.AsNoTracking()
-            .Where(item => item.Status == EventStatus.Published
+            .Where(item => item.Status == EventStatus.Published && item.Visibility == EventVisibility.Public
                 || (userId.HasValue && item.OrganizerId == userId.Value)
                 || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail)))
             .OrderBy(item => item.StartAtUtc)
-            .Select(item => new EventListItem(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString()))
+            .Select(item => new EventListItem(item.Id, item.Title, item.CategoryId, item.Category!.Name, item.Visibility.ToString(), item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString()))
             .ToListAsync(cancellationToken);
     }
 
@@ -54,7 +54,7 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         var userEmail = await GetUserEmailAsync(userId, cancellationToken);
         return await dbContext.Events.AsNoTracking()
             .Where(item => item.Id == id
-                && (item.Status == EventStatus.Published
+                && (item.Status == EventStatus.Published && item.Visibility == EventVisibility.Public
                     || (userId.HasValue && item.OrganizerId == userId.Value)
                     || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail))))
             .Select(ToDetail())
@@ -65,6 +65,8 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
     {
         var validation = Validate(command, requireTitle: true);
         if (validation is not null) return EventResult<EventDetail>.BadRequest(validation);
+        if (!Enum.TryParse<EventVisibility>(command.Visibility, true, out var visibility)) return EventResult<EventDetail>.BadRequest("Invalid event visibility.");
+        if (command.CategoryId is not null && !await dbContext.Categories.AnyAsync(item => item.Id == command.CategoryId, cancellationToken)) return EventResult<EventDetail>.BadRequest("Category was not found.");
         if (!await dbContext.Users.AnyAsync(user => user.Id == organizerId, cancellationToken)) return EventResult<EventDetail>.Unauthorized();
         var now = DateTime.UtcNow;
         var entity = new Event
@@ -73,7 +75,9 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
             OrganizerId = organizerId,
             Title = command.Title.Trim(),
             Description = command.Description,
-            Category = command.Category,
+            CategoryId = command.CategoryId,
+            Visibility = visibility,
+            RequireApproval = command.RequireApproval,
             StartAtUtc = command.StartAtUtc,
             EndAtUtc = command.EndAtUtc,
             TimeZone = command.TimeZone,
@@ -94,6 +98,8 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
     {
         var validation = Validate(command, requireTitle: true);
         if (validation is not null) return EventResult<EventDetail>.BadRequest(validation);
+        if (!Enum.TryParse<EventVisibility>(command.Visibility, true, out var visibility)) return EventResult<EventDetail>.BadRequest("Invalid event visibility.");
+        if (command.CategoryId is not null && !await dbContext.Categories.AnyAsync(item => item.Id == command.CategoryId, cancellationToken)) return EventResult<EventDetail>.BadRequest("Category was not found.");
         var entity = await dbContext.Events.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (entity is null) return EventResult<EventDetail>.NotFound();
         if (entity.OrganizerId != organizerId) return EventResult<EventDetail>.Forbidden();
@@ -101,7 +107,7 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         {
             return EventResult<EventDetail>.Conflict("Capacity cannot be lower than the confirmed participant count.");
         }
-        entity.Title = command.Title.Trim(); entity.Description = command.Description; entity.Category = command.Category; entity.StartAtUtc = command.StartAtUtc;
+        entity.Title = command.Title.Trim(); entity.Description = command.Description; entity.CategoryId = command.CategoryId; entity.Visibility = visibility; entity.RequireApproval = command.RequireApproval; entity.StartAtUtc = command.StartAtUtc;
         entity.EndAtUtc = command.EndAtUtc; entity.TimeZone = command.TimeZone; entity.LocationName = command.LocationName; entity.LocationAddress = command.LocationAddress;
         entity.OnlineMeetingUrl = command.OnlineMeetingUrl; entity.Capacity = command.Capacity; entity.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -180,7 +186,7 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         }
 
         var invite = await dbContext.EventInvites.SingleOrDefaultAsync(item => item.EventId == id && item.Email == user.Email, cancellationToken);
-        if (invite is null)
+        if (entity.Visibility == EventVisibility.InviteOnly && invite is null)
         {
             return EventResult<RsvpItem>.BadRequest("No invite found for this user and event.");
         }
@@ -191,9 +197,12 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         }
 
         var participant = await dbContext.EventParticipants.SingleOrDefaultAsync(item => item.EventId == id && item.Email == user.Email, cancellationToken);
-        var participantStatus = parsed == InviteStatus.Declined ? ParticipantStatus.Declined : await GetParticipantStatusAsync(id, entity.Capacity, cancellationToken);
-        invite.Status = participantStatus == ParticipantStatus.Confirmed ? InviteStatus.Accepted : participantStatus == ParticipantStatus.Waitlisted ? InviteStatus.Waitlisted : InviteStatus.Declined;
-        invite.RespondedAtUtc = DateTime.UtcNow;
+        var participantStatus = parsed == InviteStatus.Declined ? ParticipantStatus.Declined : entity.RequireApproval ? ParticipantStatus.PendingApproval : await GetParticipantStatusAsync(id, entity.Capacity, cancellationToken);
+        if (invite is not null)
+        {
+            invite.Status = participantStatus == ParticipantStatus.Confirmed ? InviteStatus.Accepted : participantStatus == ParticipantStatus.Waitlisted ? InviteStatus.Waitlisted : InviteStatus.Pending;
+            invite.RespondedAtUtc = DateTime.UtcNow;
+        }
         if (participant is null)
         {
             dbContext.EventParticipants.Add(new EventParticipant { Id = Guid.NewGuid(), EventId = id, UserId = user.Id, DisplayName = $"{user.FirstName} {user.LastName}".Trim(), Email = user.Email, Status = participantStatus, AddedAtUtc = DateTime.UtcNow });
@@ -212,7 +221,7 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return EventResult<RsvpItem>.Success(new RsvpItem(id, user.Email, invite.Status.ToString(), participantStatus.ToString()));
+        return EventResult<RsvpItem>.Success(new RsvpItem(id, user.Email, invite?.Status.ToString() ?? "Accepted", participantStatus.ToString()));
     }
 
     public async Task<EventResult<IReadOnlyCollection<EventParticipantItem>>> GetParticipantsAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
@@ -338,13 +347,13 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 
     private static string? Validate(EventCommand command, bool requireTitle) => requireTitle && string.IsNullOrWhiteSpace(command.Title) ? "Title is required." : command.Capacity <= 0 ? "Capacity must be greater than zero." : command.EndAtUtc is not null && command.EndAtUtc <= command.StartAtUtc ? "EndAtUtc must be greater than StartAtUtc." : null;
     private static bool IsValidStatusTransition(EventStatus current, EventStatus next) => current == next || current switch { EventStatus.Draft => next is EventStatus.Published or EventStatus.Cancelled, EventStatus.Published => next is EventStatus.Cancelled or EventStatus.Completed, _ => false };
-    private static EventDetail ToDetail(Event entity) => new(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.Category, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString());
-    private static System.Linq.Expressions.Expression<Func<Event, EventDetail>> ToDetail() => entity => new EventDetail(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.Category, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString());
+    private static EventDetail ToDetail(Event entity) => new(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.CategoryId, entity.Category?.Name, entity.Visibility.ToString(), entity.RequireApproval, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString());
+    private static System.Linq.Expressions.Expression<Func<Event, EventDetail>> ToDetail() => entity => new EventDetail(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.CategoryId, entity.Category!.Name, entity.Visibility.ToString(), entity.RequireApproval, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString());
 }
 
-public sealed record EventCommand(string Title, string? Description, string? Category, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
-public sealed record EventListItem(Guid Id, string Title, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
-public sealed record EventDetail(Guid Id, Guid OrganizerId, string Title, string? Description, string? Category, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
+public sealed record EventCommand(string Title, string? Description, Guid? CategoryId, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
+public sealed record EventListItem(Guid Id, string Title, Guid? CategoryId, string? CategoryName, string Visibility, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
+public sealed record EventDetail(Guid Id, Guid OrganizerId, string Title, string? Description, Guid? CategoryId, string? CategoryName, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
 public sealed record EventSummary(int ActiveEventCount, int AcceptedGuestCount, int WaitlistCount, double FillRate, IReadOnlyCollection<EventSummaryItem> UpcomingEvents);
 public sealed record EventSummaryItem(Guid Id, string Title, DateTime StartAtUtc, DateTime? EndAtUtc, string? LocationName, string? OnlineMeetingUrl, int Capacity, string Status, int AcceptedCount, int WaitlistCount);
 public sealed record EventInviteItem(Guid Id, string Email, string Status, DateTime InvitedAtUtc, DateTime? RespondedAtUtc);

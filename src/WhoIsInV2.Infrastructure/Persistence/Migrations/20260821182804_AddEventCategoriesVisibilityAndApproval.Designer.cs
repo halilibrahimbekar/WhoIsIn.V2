@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WhoIsInV2.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using WhoIsInV2.Infrastructure.Persistence;
 namespace WhoIsInV2.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(WhoIsInV2DbContext))]
-    partial class WhoIsInV2DbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821182804_AddEventCategoriesVisibilityAndApproval")]
+    partial class AddEventCategoriesVisibilityAndApproval
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

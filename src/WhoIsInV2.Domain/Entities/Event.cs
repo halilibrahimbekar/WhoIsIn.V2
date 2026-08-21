@@ -6,7 +6,9 @@ public class Event
     public Guid OrganizerId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string? Category { get; set; }
+    public Guid? CategoryId { get; set; }
+    public EventVisibility Visibility { get; set; } = EventVisibility.InviteOnly;
+    public bool RequireApproval { get; set; }
     public DateTime StartAtUtc { get; set; }
     public DateTime? EndAtUtc { get; set; }
     public string TimeZone { get; set; } = "UTC";
@@ -19,6 +21,7 @@ public class Event
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public User? Organizer { get; set; }
+    public Category? Category { get; set; }
     public ICollection<EventInvite> Invites { get; set; } = [];
     public ICollection<EventParticipant> Participants { get; set; } = [];
 }

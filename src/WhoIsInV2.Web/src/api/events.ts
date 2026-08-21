@@ -3,6 +3,9 @@ import { apiFetch } from './client'
 export interface EventListItem {
   id: string
   title: string
+  categoryId: string | null
+  categoryName: string | null
+  visibility: string
   startAtUtc: string
   endAtUtc: string | null
   capacity: number
@@ -12,7 +15,10 @@ export interface EventListItem {
 export interface EventDetail extends EventListItem {
   organizerId: string
   description: string | null
-  category: string | null
+  categoryId: string | null
+  categoryName: string | null
+  visibility: string
+  requireApproval: boolean
   timeZone: string
   locationName: string | null
   locationAddress: string | null
@@ -43,7 +49,9 @@ export interface EventSummary {
 export interface CreateEventRequest {
   title: string
   description: string | null
-  category: string | null
+  categoryId: string | null
+  visibility: string
+  requireApproval: boolean
   startAtUtc: string
   endAtUtc: string | null
   timeZone: string
@@ -51,6 +59,11 @@ export interface CreateEventRequest {
   locationAddress: string | null
   onlineMeetingUrl: string | null
   capacity: number
+}
+
+export interface Category {
+  id: string
+  name: string
 }
 
 async function throwApiError(response: Response, fallback: string): Promise<never> {
@@ -65,6 +78,15 @@ export async function getEvents(): Promise<EventListItem[]> {
   }
 
   return (await response.json()) as EventListItem[]
+}
+
+export async function getCategories(): Promise<Category[]> {
+  const response = await apiFetch('/api/categories')
+  if (!response.ok) {
+    return throwApiError(response, 'Could not fetch categories.')
+  }
+
+  return (await response.json()) as Category[]
 }
 
 export async function getEvent(eventId: string): Promise<EventDetail> {

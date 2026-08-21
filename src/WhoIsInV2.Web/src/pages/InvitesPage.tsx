@@ -105,18 +105,21 @@ export function InvitesPage() {
         <p>Manage RSVP states and invitation channels.</p>
       </header>
 
-      <label>
+      <label className="field-label">
         Event
-        <select
-          value={selectedEventId}
-          onChange={(event) => setSearchParams({ eventId: event.target.value })}
-          disabled={events.length === 0}
-        >
-          <option value="">Select an event</option>
-          {events.map((event) => (
-            <option value={event.id} key={event.id}>{event.title}</option>
-          ))}
-        </select>
+        <span className="select-wrap">
+          <select
+            className="select-control"
+            value={selectedEventId}
+            onChange={(event) => setSearchParams({ eventId: event.target.value })}
+            disabled={events.length === 0}
+          >
+            <option value="">Select an event</option>
+            {events.map((event) => (
+              <option value={event.id} key={event.id}>{event.title}</option>
+            ))}
+          </select>
+        </span>
       </label>
 
       <div className="table-card">
@@ -145,12 +148,12 @@ export function InvitesPage() {
                   <td>{row.respondedAtUtc ? new Date(row.respondedAtUtc).toLocaleString() : '-'}</td>
                   <td>
                     {user?.email === row.email ? <>
-                      <button type="button" className="ghost-btn" disabled={Boolean(rsvpEmail)} onClick={() => void handleRsvp(row.email, 'Accepted')}>
+                      {row.status !== 'Accepted' && <button type="button" className="ghost-btn" disabled={Boolean(rsvpEmail)} onClick={() => void handleRsvp(row.email, 'Accepted')}>
                         Accept
-                      </button>{' '}
-                      <button type="button" className="ghost-btn" disabled={Boolean(rsvpEmail)} onClick={() => void handleRsvp(row.email, 'Declined')}>
+                      </button>}
+                      {row.status !== 'Declined' && <button type="button" className="ghost-btn" disabled={Boolean(rsvpEmail)} onClick={() => void handleRsvp(row.email, 'Declined')}>
                         Decline
-                      </button>
+                      </button>}
                     </> : <span>Organizer view</span>}
                   </td>
                 </tr>

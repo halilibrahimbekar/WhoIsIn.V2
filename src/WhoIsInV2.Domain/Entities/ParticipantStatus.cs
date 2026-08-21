@@ -5,5 +5,6 @@ public enum ParticipantStatus
     Confirmed = 0,
     Waitlisted = 1,
     Declined = 2,
-    CheckedIn = 3
+    CheckedIn = 3,
+    PendingApproval = 4
 }

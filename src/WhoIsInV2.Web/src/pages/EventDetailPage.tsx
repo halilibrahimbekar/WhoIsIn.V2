@@ -6,6 +6,7 @@ import {
   getEventParticipants,
   promoteWaitlistedParticipant,
   sendEventInvites,
+  submitRsvp,
   updateParticipantStatus,
   type EventParticipant,
 } from '../api/invites'
@@ -23,6 +24,8 @@ export function EventDetailPage() {
   const [inviteMessage, setInviteMessage] = useState('')
   const [participantMessage, setParticipantMessage] = useState('')
   const [isUpdatingParticipant, setIsUpdatingParticipant] = useState(false)
+  const [rsvpMessage, setRsvpMessage] = useState('')
+  const [isSubmittingRsvp, setIsSubmittingRsvp] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -178,11 +181,25 @@ export function EventDetailPage() {
     }
   }
 
+  async function handleRsvp() {
+    if (!event) return
+    setIsSubmittingRsvp(true)
+    setRsvpMessage('')
+    try {
+      const response = await submitRsvp(event.id, 'Accepted')
+      setRsvpMessage(`Your participation status: ${response.participantStatus}`)
+    } catch (error) {
+      setRsvpMessage(error instanceof Error ? error.message : 'Could not submit RSVP.')
+    } finally {
+      setIsSubmittingRsvp(false)
+    }
+  }
+
   return (
     <section className="content-page">
       <header className="content-header">
         <h1>{event.title}</h1>
-        <p>{event.category || 'Event'} | {event.status}</p>
+        <p>{event.categoryName || 'Event'} | {event.visibility} | {event.status}</p>
       </header>
 
       <div className="detail-grid">
@@ -190,16 +207,19 @@ export function EventDetailPage() {
           <h2>Lifecycle</h2>
           <p>Current status: {event.status}</p>
           <p>{formatEventDate(event.startAtUtc, event.endAtUtc)}</p>
-          <label>
+            <label className="field-label">
             Change status
-            <select
-              value={event.status}
-              onChange={(changeEvent) => void handleStatusChange(event, changeEvent.target.value)}
-              disabled={isSavingStatus || event.status === 'Cancelled' || event.status === 'Completed'}
-            >
-              <option value={event.status}>{event.status}</option>
-              {getNextStatuses(event.status).map((status) => <option value={status} key={status}>{status}</option>)}
-            </select>
+              <span className="select-wrap">
+                <select
+                  className="select-control"
+                  value={event.status}
+                  onChange={(changeEvent) => void handleStatusChange(event, changeEvent.target.value)}
+                  disabled={isSavingStatus || event.status === 'Cancelled' || event.status === 'Completed'}
+                >
+                  <option value={event.status}>{event.status}</option>
+                  {getNextStatuses(event.status).map((status) => <option value={status} key={status}>{status}</option>)}
+                </select>
+              </span>
           </label>
         </article>}
         <article className="detail-card">
@@ -207,6 +227,14 @@ export function EventDetailPage() {
           <p>Capacity: {event.capacity}</p>
           <p>Accepted and waitlist counts are available from participants.</p>
         </article>
+        {!isOrganizer && event.visibility === 'Public' && <article className="detail-card">
+          <h2>Join event</h2>
+          <p>{event.requireApproval ? 'The organizer will approve your participation.' : 'Join this public event.'}</p>
+          {rsvpMessage && <p className="auth-error">{rsvpMessage}</p>}
+          <button type="button" className="primary-btn" disabled={isSubmittingRsvp} onClick={() => void handleRsvp()}>
+            {isSubmittingRsvp ? 'Submitting...' : 'Request participation'}
+          </button>
+        </article>}
         {isOrganizer && <article className="detail-card">
           <h2>Actions</h2>
           <p>Invite guests and monitor participant status.</p>
@@ -253,17 +281,20 @@ export function EventDetailPage() {
                   <td>{participant.displayName}</td>
                   <td>{participant.email}</td>
                   <td>
-                    <select
-                      value={participant.status}
-                      onChange={(changeEvent) => void handleParticipantStatusChange(participant, changeEvent.target.value)}
-                      disabled={isUpdatingParticipant}
-                    >
-                      {['Confirmed', 'Waitlisted', 'Declined', 'CheckedIn'].map((status) => (
-                        <option value={status} key={status}>{status}</option>
-                      ))}
-                    </select>
+                    <span className="select-wrap">
+                      <select
+                        className="select-control"
+                        value={participant.status}
+                        onChange={(changeEvent) => void handleParticipantStatusChange(participant, changeEvent.target.value)}
+                        disabled={isUpdatingParticipant}
+                      >
+                        {['Confirmed', 'PendingApproval', 'Waitlisted', 'Declined', 'CheckedIn'].map((status) => (
+                          <option value={status} key={status}>{status}</option>
+                        ))}
+                      </select>
+                    </span>
                   </td>
-                  <td>{isUpdatingParticipant ? 'Saving...' : 'Organizer control'}</td>
+                  <td>{participant.addedAtUtc ? new Date(participant.addedAtUtc).toLocaleString() : '-'}</td>
                 </tr>
               ))}
             </tbody>

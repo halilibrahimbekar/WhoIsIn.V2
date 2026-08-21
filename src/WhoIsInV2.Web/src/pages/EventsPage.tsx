@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { createEvent, getEvents, type EventListItem } from '../api/events'
+import { createEvent, getCategories, getEvents, type Category, type EventListItem } from '../api/events'
 
 export function EventsPage() {
   const [events, setEvents] = useState<EventListItem[]>([])
@@ -18,15 +18,20 @@ export function EventsPage() {
   const [capacity, setCapacity] = useState('50')
   const [locationName, setLocationName] = useState('')
   const [description, setDescription] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [visibility, setVisibility] = useState('Public')
+  const [requireApproval, setRequireApproval] = useState(false)
 
   useEffect(() => {
     let isMounted = true
 
     async function loadEvents() {
       try {
-        const response = await getEvents()
+        const [response, categoryResponse] = await Promise.all([getEvents(), getCategories()])
         if (isMounted) {
           setEvents(response)
+          setCategories(categoryResponse)
         }
       } catch (error) {
         if (isMounted) {
@@ -55,7 +60,9 @@ export function EventsPage() {
       await createEvent({
         title,
         description: description || null,
-        category: null,
+        categoryId: categoryId || null,
+        visibility,
+        requireApproval,
         startAtUtc: new Date(startAt).toISOString(),
         endAtUtc: endAt ? new Date(endAt).toISOString() : null,
         timeZone,
@@ -70,6 +77,9 @@ export function EventsPage() {
       setCapacity('50')
       setLocationName('')
       setDescription('')
+      setCategoryId('')
+      setVisibility('Public')
+      setRequireApproval(false)
       setIsCreateOpen(false)
       setRefreshKey((value) => value + 1)
     } catch (error) {
@@ -99,6 +109,24 @@ export function EventsPage() {
           <label>
             Description
             <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
+          </label>
+          <label>
+            Category
+            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} required>
+              <option value="">Select a category</option>
+              {categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          <label>
+            Event access
+            <select value={visibility} onChange={(event) => setVisibility(event.target.value)}>
+              <option value="Public">Everyone can see and join</option>
+              <option value="InviteOnly">Invitees only</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" checked={requireApproval} onChange={(event) => setRequireApproval(event.target.checked)} />
+            Organizer approval required
           </label>
           <label>
             Starts
@@ -147,7 +175,7 @@ export function EventsPage() {
             <tbody>
               {events.map((event) => (
                 <tr key={event.id}>
-                  <td>{event.title}</td>
+                  <td>{event.title}<br /><small>{event.categoryName || 'Uncategorized'} | {event.visibility}</small></td>
                   <td>{formatEventDate(event.startAtUtc, event.endAtUtc)}</td>
                   <td>{event.status}</td>
                   <td>{event.capacity}</td>

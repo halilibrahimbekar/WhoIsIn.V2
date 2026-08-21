@@ -16,7 +16,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     public async Task<ActionResult<IReadOnlyCollection<EventListItemResponse>>> GetAll(CancellationToken cancellationToken)
     {
         var events = await eventService.GetAllAsync(CurrentUserId(), cancellationToken);
-        return Ok(events.Select(item => new EventListItemResponse(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status)).ToArray());
+        return Ok(events.Select(item => new EventListItemResponse(item.Id, item.Title, item.CategoryId, item.CategoryName, item.Visibility, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status)).ToArray());
     }
 
     [Authorize]
@@ -110,15 +110,15 @@ public class EventsController(IEventService eventService) : ControllerBase
     }
 
     private Guid? CurrentUserId() { var subject = User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier); return Guid.TryParse(subject, out var id) ? id : null; }
-    private static EventCommand ToCommand(CreateEventRequest item) => new(item.Title, item.Description, item.Category, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity);
-    private static EventCommand ToCommand(UpdateEventRequest item) => new(item.Title, item.Description, item.Category, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity);
-    private static EventDetailResponse ToResponse(EventDetail item) => new(item.Id, item.OrganizerId, item.Title, item.Description, item.Category, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity, item.Status);
+    private static EventCommand ToCommand(CreateEventRequest item) => new(item.Title, item.Description, item.CategoryId, item.Visibility, item.RequireApproval, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity);
+    private static EventCommand ToCommand(UpdateEventRequest item) => new(item.Title, item.Description, item.CategoryId, item.Visibility, item.RequireApproval, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity);
+    private static EventDetailResponse ToResponse(EventDetail item) => new(item.Id, item.OrganizerId, item.Title, item.Description, item.CategoryId, item.CategoryName, item.Visibility, item.RequireApproval, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity, item.Status);
     private ActionResult Map(EventResult result) => result.Status switch { EventOperationStatus.BadRequest => BadRequest(result.Error), EventOperationStatus.Unauthorized => Unauthorized(), EventOperationStatus.Forbidden => Forbid(), EventOperationStatus.NotFound => result.Error is null ? NotFound() : NotFound(result.Error), EventOperationStatus.Conflict => Conflict(result.Error), _ => Problem(statusCode: 500) };
     private ActionResult Map<T>(EventResult<T> result) => Map((EventResult)result);
 }
 
-public sealed record CreateEventRequest(string Title, string? Description, string? Category, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
-public sealed record UpdateEventRequest(string Title, string? Description, string? Category, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
+public sealed record CreateEventRequest(string Title, string? Description, Guid? CategoryId, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
+public sealed record UpdateEventRequest(string Title, string? Description, Guid? CategoryId, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
 public sealed record UpdateEventStatusRequest(string Status);
 public sealed record InviteUsersRequest(IReadOnlyCollection<string> Emails);
 public sealed record UpdateParticipantStatusRequest(string Status);
@@ -126,7 +126,7 @@ public sealed record EventInviteResponse(Guid Id, string Email, string Status, D
 public sealed record RsvpRequest(string Decision);
 public sealed record RsvpResponse(Guid EventId, string Email, string InviteStatus, string ParticipantStatus);
 public sealed record EventParticipantResponse(Guid Id, string Email, string DisplayName, string Status, DateTime AddedAtUtc);
-public sealed record EventListItemResponse(Guid Id, string Title, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
-public sealed record EventDetailResponse(Guid Id, Guid OrganizerId, string Title, string? Description, string? Category, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
+public sealed record EventListItemResponse(Guid Id, string Title, Guid? CategoryId, string? CategoryName, string Visibility, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
+public sealed record EventDetailResponse(Guid Id, Guid OrganizerId, string Title, string? Description, Guid? CategoryId, string? CategoryName, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
 public sealed record EventSummaryResponse(int ActiveEventCount, int AcceptedGuestCount, int WaitlistCount, double FillRate, IReadOnlyCollection<EventSummaryItemResponse> UpcomingEvents);
 public sealed record EventSummaryItemResponse(Guid Id, string Title, DateTime StartAtUtc, DateTime? EndAtUtc, string? LocationName, string? OnlineMeetingUrl, int Capacity, string Status, int AcceptedCount, int WaitlistCount);

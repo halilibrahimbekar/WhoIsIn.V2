@@ -6,6 +6,7 @@ namespace WhoIsInV2.Application.Common.Interfaces;
 public interface IWhoIsInV2DbContext
 {
     DbSet<User> Users { get; }
+    DbSet<Category> Categories { get; }
     DbSet<Event> Events { get; }
     DbSet<EventInvite> EventInvites { get; }
     DbSet<EventParticipant> EventParticipants { get; }
