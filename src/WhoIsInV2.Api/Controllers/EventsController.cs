@@ -13,7 +13,11 @@ namespace WhoIsInV2.Api.Controllers;
 public class EventsController(IEventService eventService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<EventListItemResponse>>> GetAll(CancellationToken cancellationToken) => Ok((await eventService.GetAllAsync(cancellationToken)).Select(item => new EventListItemResponse(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status)).ToArray());
+    public async Task<ActionResult<IReadOnlyCollection<EventListItemResponse>>> GetAll(CancellationToken cancellationToken)
+    {
+        var events = await eventService.GetAllAsync(CurrentUserId(), cancellationToken);
+        return Ok(events.Select(item => new EventListItemResponse(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status)).ToArray());
+    }
 
     [Authorize]
     [HttpGet("summary")]
@@ -25,7 +29,11 @@ public class EventsController(IEventService eventService) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<EventDetailResponse>> GetById(Guid id, CancellationToken cancellationToken) { var item = await eventService.GetByIdAsync(id, cancellationToken); return item is null ? NotFound() : Ok(ToResponse(item)); }
+    public async Task<ActionResult<EventDetailResponse>> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await eventService.GetByIdAsync(id, CurrentUserId(), cancellationToken);
+        return item is null ? NotFound() : Ok(ToResponse(item));
+    }
 
     [Authorize]
     [HttpPost]

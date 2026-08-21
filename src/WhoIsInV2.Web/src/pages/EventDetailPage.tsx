@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getEvent, updateEventStatus, type EventDetail } from '../api/events'
+import { useAuth } from '../auth/AuthContext'
 import {
   getEventParticipants,
   promoteWaitlistedParticipant,
@@ -11,6 +12,7 @@ import {
 
 export function EventDetailPage() {
   const { eventId } = useParams()
+  const { user } = useAuth()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -59,7 +61,7 @@ export function EventDetailPage() {
     let isMounted = true
 
     async function loadParticipants() {
-      if (!eventId) {
+      if (!eventId || !event || !user || event.organizerId !== user.id) {
         return
       }
 
@@ -80,7 +82,7 @@ export function EventDetailPage() {
     return () => {
       isMounted = false
     }
-  }, [eventId])
+  }, [event, eventId, user])
 
   if (isLoading) {
     return <section className="content-page"><p>Loading event...</p></section>
@@ -89,6 +91,8 @@ export function EventDetailPage() {
   if (errorMessage || !event) {
     return <section className="content-page"><p className="auth-error">{errorMessage || 'Event not found.'}</p></section>
   }
+
+  const isOrganizer = user?.id === event.organizerId
 
   async function handleStatusChange(currentEvent: EventDetail, nextStatus: string) {
     setErrorMessage('')
@@ -182,7 +186,7 @@ export function EventDetailPage() {
       </header>
 
       <div className="detail-grid">
-        <article className="detail-card">
+        {isOrganizer && <article className="detail-card">
           <h2>Lifecycle</h2>
           <p>Current status: {event.status}</p>
           <p>{formatEventDate(event.startAtUtc, event.endAtUtc)}</p>
@@ -197,13 +201,13 @@ export function EventDetailPage() {
               {getNextStatuses(event.status).map((status) => <option value={status} key={status}>{status}</option>)}
             </select>
           </label>
-        </article>
+        </article>}
         <article className="detail-card">
           <h2>Capacity</h2>
           <p>Capacity: {event.capacity}</p>
           <p>Accepted and waitlist counts are available from participants.</p>
         </article>
-        <article className="detail-card">
+        {isOrganizer && <article className="detail-card">
           <h2>Actions</h2>
           <p>Invite guests and monitor participant status.</p>
           <form className="auth-form" onSubmit={(formEvent) => void handleSendInvites(event, formEvent)}>
@@ -222,7 +226,7 @@ export function EventDetailPage() {
             </button>
           </form>
           <Link to="/app/invites">Go to invites</Link>
-        </article>
+        </article>}
       </div>
 
       <div className="detail-card">
@@ -231,7 +235,7 @@ export function EventDetailPage() {
         {event.description && <p>{event.description}</p>}
       </div>
 
-      <div className="table-card">
+      {isOrganizer && <div className="table-card">
         <h2>Participants</h2>
         <button type="button" className="ghost-btn" onClick={() => void handlePromoteWaitlist()} disabled={isUpdatingParticipant}>
           Promote next waitlisted
@@ -265,7 +269,7 @@ export function EventDetailPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </div>}
     </section>
   )
 }

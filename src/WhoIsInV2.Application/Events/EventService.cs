@@ -1,6 +1,6 @@
-using System.Security.Cryptography;
-
 using Microsoft.EntityFrameworkCore;
+
+using System.Security.Cryptography;
 
 using WhoIsInV2.Application.Common.Interfaces;
 using WhoIsInV2.Domain.Entities;
@@ -9,9 +9,9 @@ namespace WhoIsInV2.Application.Events;
 
 public interface IEventService
 {
-    Task<IReadOnlyCollection<EventListItem>> GetAllAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyCollection<EventListItem>> GetAllAsync(Guid? userId, CancellationToken cancellationToken);
     Task<EventSummary> GetSummaryAsync(Guid organizerId, CancellationToken cancellationToken);
-    Task<EventDetail?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<EventDetail?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken);
     Task<EventResult<EventDetail>> CreateAsync(Guid organizerId, EventCommand command, CancellationToken cancellationToken);
     Task<EventResult<EventDetail>> UpdateAsync(Guid organizerId, Guid id, EventCommand command, CancellationToken cancellationToken);
     Task<EventResult> UpdateStatusAsync(Guid organizerId, Guid id, string status, CancellationToken cancellationToken);
@@ -25,8 +25,17 @@ public interface IEventService
 
 public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 {
-    public async Task<IReadOnlyCollection<EventListItem>> GetAllAsync(CancellationToken cancellationToken) => await dbContext.Events.AsNoTracking()
-        .OrderBy(item => item.StartAtUtc).Select(item => new EventListItem(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString())).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyCollection<EventListItem>> GetAllAsync(Guid? userId, CancellationToken cancellationToken)
+    {
+        var userEmail = await GetUserEmailAsync(userId, cancellationToken);
+        return await dbContext.Events.AsNoTracking()
+            .Where(item => item.Status == EventStatus.Published
+                || (userId.HasValue && item.OrganizerId == userId.Value)
+                || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail)))
+            .OrderBy(item => item.StartAtUtc)
+            .Select(item => new EventListItem(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString()))
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<EventSummary> GetSummaryAsync(Guid organizerId, CancellationToken cancellationToken)
     {
@@ -40,12 +49,21 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
             capacity == 0 ? 0 : Math.Round(accepted * 100d / capacity, 1), events.Take(5).ToArray());
     }
 
-    public Task<EventDetail?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => dbContext.Events.AsNoTracking().Where(item => item.Id == id)
-        .Select(ToDetail()).SingleOrDefaultAsync(cancellationToken);
+    public async Task<EventDetail?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken)
+    {
+        var userEmail = await GetUserEmailAsync(userId, cancellationToken);
+        return await dbContext.Events.AsNoTracking()
+            .Where(item => item.Id == id
+                && (item.Status == EventStatus.Published
+                    || (userId.HasValue && item.OrganizerId == userId.Value)
+                    || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail))))
+            .Select(ToDetail())
+            .SingleOrDefaultAsync(cancellationToken);
+    }
 
     public async Task<EventResult<EventDetail>> CreateAsync(Guid organizerId, EventCommand command, CancellationToken cancellationToken)
     {
-        var validation = Validate(command, requireTitle: false);
+        var validation = Validate(command, requireTitle: true);
         if (validation is not null) return EventResult<EventDetail>.BadRequest(validation);
         if (!await dbContext.Users.AnyAsync(user => user.Id == organizerId, cancellationToken)) return EventResult<EventDetail>.Unauthorized();
         var now = DateTime.UtcNow;
@@ -79,6 +97,10 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         var entity = await dbContext.Events.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (entity is null) return EventResult<EventDetail>.NotFound();
         if (entity.OrganizerId != organizerId) return EventResult<EventDetail>.Forbidden();
+        if (command.Capacity < await dbContext.EventParticipants.CountAsync(item => item.EventId == id && item.Status == ParticipantStatus.Confirmed, cancellationToken))
+        {
+            return EventResult<EventDetail>.Conflict("Capacity cannot be lower than the confirmed participant count.");
+        }
         entity.Title = command.Title.Trim(); entity.Description = command.Description; entity.Category = command.Category; entity.StartAtUtc = command.StartAtUtc;
         entity.EndAtUtc = command.EndAtUtc; entity.TimeZone = command.TimeZone; entity.LocationName = command.LocationName; entity.LocationAddress = command.LocationAddress;
         entity.OnlineMeetingUrl = command.OnlineMeetingUrl; entity.Capacity = command.Capacity; entity.UpdatedAtUtc = DateTime.UtcNow;
@@ -100,9 +122,18 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 
     public async Task<EventResult<IReadOnlyCollection<EventInviteItem>>> GetInvitesAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
     {
-        var ownership = await CheckOwnershipAsync(organizerId, id, cancellationToken);
-        if (ownership is not null) return EventResult<IReadOnlyCollection<EventInviteItem>>.From(ownership);
-        var invites = await dbContext.EventInvites.AsNoTracking().Where(item => item.EventId == id).OrderBy(item => item.Email)
+        var entity = await dbContext.Events.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (entity is null) return EventResult<IReadOnlyCollection<EventInviteItem>>.NotFound();
+
+        var userEmail = entity.OrganizerId == organizerId ? null : await GetUserEmailAsync(organizerId, cancellationToken);
+        if (entity.OrganizerId != organizerId && userEmail is null)
+        {
+            return EventResult<IReadOnlyCollection<EventInviteItem>>.Unauthorized();
+        }
+
+        var invites = await dbContext.EventInvites.AsNoTracking()
+            .Where(item => item.EventId == id && (entity.OrganizerId == organizerId || item.Email == userEmail))
+            .OrderBy(item => item.Email)
             .Select(item => new EventInviteItem(item.Id, item.Email, item.Status.ToString(), item.InvitedAtUtc, item.RespondedAtUtc)).ToListAsync(cancellationToken);
         return EventResult<IReadOnlyCollection<EventInviteItem>>.Success(invites);
     }
@@ -132,28 +163,66 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
     public async Task<EventResult<RsvpItem>> RsvpAsync(Guid userId, Guid id, string decision, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users.AsNoTracking().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
-        if (user is null) return EventResult<RsvpItem>.Unauthorized();
+        if (user is null)
+        {
+            return EventResult<RsvpItem>.Unauthorized();
+        }
+
         var entity = await dbContext.Events.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-        if (entity is null) return EventResult<RsvpItem>.NotFound();
+        if (entity is null)
+        {
+            return EventResult<RsvpItem>.NotFound();
+        }
+
+        if (entity.Status != EventStatus.Published)
+        {
+            return EventResult<RsvpItem>.BadRequest("RSVP is only available for published events.");
+        }
+
         var invite = await dbContext.EventInvites.SingleOrDefaultAsync(item => item.EventId == id && item.Email == user.Email, cancellationToken);
-        if (invite is null) return EventResult<RsvpItem>.BadRequest("No invite found for this user and event.");
-        if (!Enum.TryParse<InviteStatus>(decision, true, out var parsed) || parsed is not (InviteStatus.Accepted or InviteStatus.Declined)) return EventResult<RsvpItem>.BadRequest("Decision must be Accepted or Declined.");
+        if (invite is null)
+        {
+            return EventResult<RsvpItem>.BadRequest("No invite found for this user and event.");
+        }
+
+        if (!Enum.TryParse<InviteStatus>(decision, true, out var parsed) || parsed is not (InviteStatus.Accepted or InviteStatus.Declined))
+        {
+            return EventResult<RsvpItem>.BadRequest("Decision must be Accepted or Declined.");
+        }
+
         var participant = await dbContext.EventParticipants.SingleOrDefaultAsync(item => item.EventId == id && item.Email == user.Email, cancellationToken);
         var participantStatus = parsed == InviteStatus.Declined ? ParticipantStatus.Declined : await GetParticipantStatusAsync(id, entity.Capacity, cancellationToken);
         invite.Status = participantStatus == ParticipantStatus.Confirmed ? InviteStatus.Accepted : participantStatus == ParticipantStatus.Waitlisted ? InviteStatus.Waitlisted : InviteStatus.Declined;
         invite.RespondedAtUtc = DateTime.UtcNow;
-        if (participant is null) dbContext.EventParticipants.Add(new EventParticipant { Id = Guid.NewGuid(), EventId = id, UserId = user.Id, DisplayName = $"{user.FirstName} {user.LastName}".Trim(), Email = user.Email, Status = participantStatus, AddedAtUtc = DateTime.UtcNow });
-        else participant.Status = participantStatus;
+        if (participant is null)
+        {
+            dbContext.EventParticipants.Add(new EventParticipant { Id = Guid.NewGuid(), EventId = id, UserId = user.Id, DisplayName = $"{user.FirstName} {user.LastName}".Trim(), Email = user.Email, Status = participantStatus, AddedAtUtc = DateTime.UtcNow });
+        }
+        else
+        {
+            participant.Status = participantStatus;
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
-        if (participantStatus == ParticipantStatus.Declined) await PromoteFirstAsync(id, cancellationToken);
-        if (participantStatus == ParticipantStatus.Declined) await dbContext.SaveChangesAsync(cancellationToken);
+        if (participantStatus == ParticipantStatus.Declined)
+        {
+            await PromoteFirstAsync(id, cancellationToken);
+        }
+        if (participantStatus == ParticipantStatus.Declined)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         return EventResult<RsvpItem>.Success(new RsvpItem(id, user.Email, invite.Status.ToString(), participantStatus.ToString()));
     }
 
     public async Task<EventResult<IReadOnlyCollection<EventParticipantItem>>> GetParticipantsAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
     {
         var ownership = await CheckOwnershipAsync(organizerId, id, cancellationToken);
-        if (ownership is not null) return EventResult<IReadOnlyCollection<EventParticipantItem>>.From(ownership);
+        if (ownership is not null)
+        {
+            return EventResult<IReadOnlyCollection<EventParticipantItem>>.From(ownership);
+        }
+
         var participants = await dbContext.EventParticipants.AsNoTracking().Where(item => item.EventId == id).OrderBy(item => item.AddedAtUtc)
             .Select(item => new EventParticipantItem(item.Id, item.Email, item.DisplayName, item.Status.ToString(), item.AddedAtUtc)).ToListAsync(cancellationToken);
         return EventResult<IReadOnlyCollection<EventParticipantItem>>.Success(participants);
@@ -162,26 +231,68 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
     public async Task<EventResult> UpdateParticipantStatusAsync(Guid organizerId, Guid id, Guid participantId, string status, CancellationToken cancellationToken)
     {
         var entity = await dbContext.Events.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-        if (entity is null) return EventResult.NotFound(); if (entity.OrganizerId != organizerId) return EventResult.Forbidden();
-        if (!Enum.TryParse<ParticipantStatus>(status, true, out var nextStatus)) return EventResult.BadRequest("Invalid participant status.");
+        if (entity is null)
+        {
+            return EventResult.NotFound();
+        }
+
+        if (entity.OrganizerId != organizerId)
+        {
+            return EventResult.Forbidden();
+        }
+
+        if (!Enum.TryParse<ParticipantStatus>(status, true, out var nextStatus))
+        {
+            return EventResult.BadRequest("Invalid participant status.");
+        }
+
         var participant = await dbContext.EventParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.EventId == id, cancellationToken);
-        if (participant is null) return EventResult.NotFound();
+        if (participant is null)
+        {
+            return EventResult.NotFound();
+        }
+
         if (nextStatus == ParticipantStatus.Confirmed && participant.Status != ParticipantStatus.Confirmed && await dbContext.EventParticipants.CountAsync(item => item.EventId == id && item.Status == ParticipantStatus.Confirmed, cancellationToken) >= entity.Capacity)
+        {
             return EventResult.Conflict("Event capacity has been reached.");
+        }
         participant.Status = nextStatus;
         var invite = await dbContext.EventInvites.SingleOrDefaultAsync(item => item.EventId == id && item.Email == participant.Email, cancellationToken);
-        if (invite is not null) { invite.Status = nextStatus == ParticipantStatus.Confirmed ? InviteStatus.Accepted : nextStatus == ParticipantStatus.Waitlisted ? InviteStatus.Waitlisted : InviteStatus.Declined; invite.RespondedAtUtc = DateTime.UtcNow; }
-        await dbContext.SaveChangesAsync(cancellationToken); return EventResult.Success();
+        if (invite is not null)
+        {
+            invite.Status = nextStatus == ParticipantStatus.Confirmed ? InviteStatus.Accepted : nextStatus == ParticipantStatus.Waitlisted ? InviteStatus.Waitlisted : InviteStatus.Declined;
+            invite.RespondedAtUtc = DateTime.UtcNow;
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return EventResult.Success();
     }
 
     public async Task<EventResult> PromoteWaitlistedAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
     {
         var entity = await dbContext.Events.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-        if (entity is null) return EventResult.NotFound(); if (entity.OrganizerId != organizerId) return EventResult.Forbidden();
-        if (await dbContext.EventParticipants.CountAsync(item => item.EventId == id && item.Status == ParticipantStatus.Confirmed, cancellationToken) >= entity.Capacity) return EventResult.Conflict("Event capacity has been reached.");
+        if (entity is null)
+        {
+            return EventResult.NotFound();
+        }
+
+        if (entity.OrganizerId != organizerId)
+        {
+            return EventResult.Forbidden();
+        }
+
+        if (await dbContext.EventParticipants.CountAsync(item => item.EventId == id && item.Status == ParticipantStatus.Confirmed, cancellationToken) >= entity.Capacity)
+        {
+            return EventResult.Conflict("Event capacity has been reached.");
+        }
+
         var promoted = await PromoteFirstAsync(id, cancellationToken);
-        if (!promoted) return EventResult.NotFound("No waitlisted participant found.");
-        await dbContext.SaveChangesAsync(cancellationToken); return EventResult.Success();
+        if (!promoted)
+        {
+            return EventResult.NotFound("No waitlisted participant found.");
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return EventResult.Success();
     }
 
     private async Task<EventResult?> CheckOwnershipAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
@@ -194,18 +305,34 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         return await dbContext.Events.AnyAsync(item => item.Id == id, cancellationToken) ? EventResult.Forbidden() : EventResult.NotFound();
     }
 
+    private async Task<string?> GetUserEmailAsync(Guid? userId, CancellationToken cancellationToken) => userId is null
+        ? null
+        : await dbContext.Users.Where(user => user.Id == userId.Value).Select(user => user.Email).SingleOrDefaultAsync(cancellationToken);
+
     private async Task<ParticipantStatus> GetParticipantStatusAsync(Guid eventId, int capacity, CancellationToken cancellationToken) =>
         await dbContext.EventParticipants.CountAsync(item => item.EventId == eventId && item.Status == ParticipantStatus.Confirmed, cancellationToken) < capacity ? ParticipantStatus.Confirmed : ParticipantStatus.Waitlisted;
 
     private async Task<bool> PromoteFirstAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var eventCapacity = await dbContext.Events.Where(item => item.Id == eventId).Select(item => (int?)item.Capacity).SingleOrDefaultAsync(cancellationToken);
-        if (eventCapacity is null || await dbContext.EventParticipants.CountAsync(item => item.EventId == eventId && item.Status == ParticipantStatus.Confirmed, cancellationToken) >= eventCapacity.Value) return false;
+        if (eventCapacity is null || await dbContext.EventParticipants.CountAsync(item => item.EventId == eventId && item.Status == ParticipantStatus.Confirmed, cancellationToken) >= eventCapacity.Value)
+        {
+            return false;
+        }
+
         var participant = await dbContext.EventParticipants.Where(item => item.EventId == eventId && item.Status == ParticipantStatus.Waitlisted).OrderBy(item => item.AddedAtUtc).FirstOrDefaultAsync(cancellationToken);
-        if (participant is null) return false;
+        if (participant is null)
+        {
+            return false;
+        }
+
         participant.Status = ParticipantStatus.Confirmed;
         var invite = await dbContext.EventInvites.FirstOrDefaultAsync(item => item.EventId == eventId && item.Email == participant.Email, cancellationToken);
-        if (invite is not null) { invite.Status = InviteStatus.Accepted; invite.RespondedAtUtc = DateTime.UtcNow; }
+        if (invite is not null)
+        {
+            invite.Status = InviteStatus.Accepted;
+            invite.RespondedAtUtc = DateTime.UtcNow;
+        }
         return true;
     }
 
@@ -231,5 +358,5 @@ public class EventResult(EventOperationStatus status, string? error = null)
 }
 public sealed class EventResult<T>(EventOperationStatus status, T? value = default, string? error = null) : EventResult(status, error)
 {
-    public T? Value { get; } = value; public static EventResult<T> Success(T value) => new(EventOperationStatus.Success, value); public static new EventResult<T> BadRequest(string error) => new(EventOperationStatus.BadRequest, error: error); public static new EventResult<T> Unauthorized() => new(EventOperationStatus.Unauthorized); public static new EventResult<T> Forbidden() => new(EventOperationStatus.Forbidden); public static EventResult<T> NotFound() => new(EventOperationStatus.NotFound); public static EventResult<T> From(EventResult result) => new(result.Status, error: result.Error);
+    public T? Value { get; } = value; public static EventResult<T> Success(T value) => new(EventOperationStatus.Success, value); public static new EventResult<T> BadRequest(string error) => new(EventOperationStatus.BadRequest, error: error); public static new EventResult<T> Unauthorized() => new(EventOperationStatus.Unauthorized); public static new EventResult<T> Forbidden() => new(EventOperationStatus.Forbidden); public static EventResult<T> NotFound() => new(EventOperationStatus.NotFound); public static new EventResult<T> Conflict(string error) => new(EventOperationStatus.Conflict, error: error); public static EventResult<T> From(EventResult result) => new(result.Status, error: result.Error);
 }

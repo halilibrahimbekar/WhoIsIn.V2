@@ -34,11 +34,11 @@ Durumlar:
 | M1-07 | FE otomatik access token yenileme | DONE | 401 durumunda `/api/auth/refresh` ile token yenileme ve istek tekrar deneme eklendi |
 | M1-08 | Logout server-side token revoke | DONE | Cikis aksiyonunda `/api/auth/revoke` cagrisi ve sonrasinda local session temizligi eklendi |
 | M1-09 | Landing page + register yonlendirmesi | DONE | Ana sayfa landing olarak degisti, register formu eklendi ve uygulama paneli `/app` altina tasindi |
-| M1-10 | Event sahiplik ve rol yetkilendirmesi | IN_PROGRESS | Create artik JWT claim'deki kullaniciyi organizer olarak kullaniyor; update/status/participant sahiplik kontrolleri eklendi, rol policy ve public/private ayrimi acik |
-| M1-11 | Event CRUD ve durum gecis kurallari | IN_PROGRESS | PUT/update endpointi ve temel Draft/Published/Cancelled/Completed gecisleri eklendi; concurrency ve tam validation sonraki adim |
-| M1-12 | Invite/participant sorgu ve yonetim endpointleri | IN_PROGRESS | Invite GET, participant GET/PATCH ve organizer waitlist promote endpointleri eklendi; pagination/filtreleme ve akis edge-case'leri acik |
+| M1-10 | Event sahiplik ve rol yetkilendirmesi | IN_PROGRESS | Create artik JWT claim'deki kullaniciyi organizer olarak kullaniyor; update/status/participant sahiplik kontrolleri eklendi, public list/detail sorgularinda Published + organizer-owned gorunurluk uygulandi, davetli kullanici icin private erisim eklendi; rol policy acik |
+| M1-11 | Event CRUD ve durum gecis kurallari | IN_PROGRESS | PUT/update endpointi ve temel Draft/Published/Cancelled/Completed gecisleri eklendi; create title validation ve kapasite-confirmed kontrolu eklendi, concurrency ve zaman validation sonraki adim |
+| M1-12 | Invite/participant sorgu ve yonetim endpointleri | IN_PROGRESS | Organizer tum invite'lari, davetli kullanici yalnizca kendi invite kaydini okuyabiliyor; participant GET/PATCH ve organizer waitlist promote endpointleri eklendi; pagination/filtreleme ve concurrency edge-case'leri acik |
 | M1-13 | Web event API entegrasyonu | IN_PROGRESS | Events, EventDetail, Invites ve Dashboard gercek API'ye baglandi; event aksiyon akislarinda entegrasyon devam ediyor |
-| M1-14 | Web event olusturma ve RSVP aksiyonlari | IN_PROGRESS | Event olusturma, status PATCH, invite gonderme, participant status, RSVP ve waitlist promote UI'ya baglandi; edge-case UX acik |
+| M1-14 | Web event olusturma ve RSVP aksiyonlari | IN_PROGRESS | Event olusturma, status PATCH, invite gonderme, participant status, RSVP ve waitlist promote UI'ya baglandi; private event davetlileri organizer-only detay kontrollerinden ayrildi, edge-case UX acik |
 | M1-15 | Organizer dashboard gercek metrikleri | IN_PROGRESS | Organizer summary endpointi ile active events, accepted, waitlist, fill rate ve upcoming events gercek veriden geliyor; aktivite timeline'i acik |
 | M1-16 | MVP bildirim akislarinin tasarlanmasi | TODO | Invite, RSVP ve event update/iptal bildirimleri icin kanal ve teslim modeli netlestirilmeli |
 
@@ -97,6 +97,11 @@ Asagidaki sira, API guvenligi ve veri kontratlari oturmadan web ekranlarinin tek
 7. Faz 2 Flutter mobil MVP'ye basla.
 
 ## Degisiklik Kaydi
+- 2026-08-21: Davetli kullanicinin Invites ekraninda organizer-only 403 almasi duzeltildi; GET invites organizer icin tum kayitlari, davetli icin yalnizca kendi kaydini donduruyor. Backend build basarili.
+- 2026-08-21: Event detail sayfasinda participant sorgusu ve lifecycle/invite/participant kontrolleri organizer sahipligi ile sinirlandi; private event davetlileri 403 kaynakli sayfa hatasi almiyor. Frontend build basarili.
+- 2026-08-21: RSVP akisi Draft, Cancelled ve Completed eventlerde engellendi; kabul/ret ve waitlist mutasyonu yalnizca Published eventlerde yapiliyor. Backend build basarili.
+- 2026-08-21: Authenticated invite sahibi kullanicilarin private eventleri listede ve detayda gorebilmesi saglandi; anonymous erisim yalnizca Published eventlerle sinirli kaldi. Backend build basarili.
+- 2026-08-21: Event list/detail gorunurlugu Published eventler ve authenticated organizer'in kendi eventleri ile sinirlandi; create baslik zorunlulugu ve kapasitenin confirmed participant sayisinin altina dusmesini engelleyen validation eklendi. Backend/frontend build basarili.
 - 2026-08-20: Clean Architecture katmanlari etkinlestirilmeye baslandi. Auth, Users ve Events endpointlerindeki veri erisimi ve use-case kurallari Application servislerine tasindi; API controllerlari HTTP adaptoru olarak sadeleştirildi.
 - 2026-08-20: Swagger UI, ASP.NET Core `AddOpenApi`/`MapOpenApi` tarafindan uretilen `/openapi/v1.json` dokumanina acikca baglandi. Solution build basarili ve NU1903 guvenlik uyarisi gorulmedi.
 - 2026-08-20: RSVP aksiyonlari yalnizca oturum kullanicisinin kendi invite satirinda gosterildi; decline sonrasi waitlist promote sirasi duzeltildi. Frontend/backend build basarili.
