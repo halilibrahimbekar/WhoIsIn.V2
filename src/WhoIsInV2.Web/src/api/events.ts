@@ -12,6 +12,23 @@ export interface EventListItem {
   status: string
 }
 
+export interface PagedResponse<T> {
+  items: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export interface EventListQuery {
+  search?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}
+
 export interface EventDetail extends EventListItem {
   organizerId: string
   description: string | null
@@ -67,17 +84,30 @@ export interface Category {
 }
 
 async function throwApiError(response: Response, fallback: string): Promise<never> {
-  const errorText = await response.text()
-  throw new Error(errorText || fallback)
+  let message = fallback
+  try {
+    const json = await response.json() as { detail?: string; title?: string }
+    message = json.detail ?? json.title ?? fallback
+  } catch {
+    const text = await response.text().catch(() => '')
+    if (text) message = text
+  }
+  throw new Error(message)
 }
 
-export async function getEvents(): Promise<EventListItem[]> {
-  const response = await apiFetch('/api/events')
+export async function getEvents(query?: EventListQuery): Promise<PagedResponse<EventListItem>> {
+  const params = new URLSearchParams()
+  if (query?.search) params.set('search', query.search)
+  if (query?.status) params.set('status', query.status)
+  if (query?.page != null) params.set('page', String(query.page))
+  if (query?.pageSize != null) params.set('pageSize', String(query.pageSize))
+  const qs = params.toString()
+  const response = await apiFetch(`/api/events${qs ? `?${qs}` : ''}`)
   if (!response.ok) {
     return throwApiError(response, 'Could not fetch events.')
   }
 
-  return (await response.json()) as EventListItem[]
+  return (await response.json()) as PagedResponse<EventListItem>
 }
 
 export async function getCategories(): Promise<Category[]> {

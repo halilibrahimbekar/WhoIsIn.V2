@@ -13,10 +13,12 @@ namespace WhoIsInV2.Api.Controllers;
 public class EventsController(IEventService eventService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<EventListItemResponse>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResponse<EventListItemResponse>>> GetAll([FromQuery] EventListQueryParams query, CancellationToken cancellationToken)
     {
-        var events = await eventService.GetAllAsync(CurrentUserId(), cancellationToken);
-        return Ok(events.Select(item => new EventListItemResponse(item.Id, item.Title, item.CategoryId, item.CategoryName, item.Visibility, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status)).ToArray());
+        var result = await eventService.GetAllAsync(CurrentUserId(), new EventListQuery(query.Page, query.PageSize, query.Search, query.Status), cancellationToken);
+        return Ok(new PagedResponse<EventListItemResponse>(
+            result.Items.Select(item => new EventListItemResponse(item.Id, item.Title, item.CategoryId, item.CategoryName, item.Visibility, item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status)).ToArray(),
+            result.TotalCount, result.Page, result.PageSize, result.TotalPages, result.HasNextPage, result.HasPreviousPage));
     }
 
     [Authorize]
@@ -59,7 +61,7 @@ public class EventsController(IEventService eventService) : ControllerBase
 
     [Authorize]
     [HttpGet("{id:guid}/invites")]
-    public async Task<ActionResult<IReadOnlyCollection<EventInviteResponse>>> GetInvites(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResponse<EventInviteResponse>>> GetInvites(Guid id, [FromQuery] PageQueryParams paging, CancellationToken cancellationToken)
     {
         var userId = CurrentUserId();
         if (userId is null)
@@ -67,8 +69,10 @@ public class EventsController(IEventService eventService) : ControllerBase
             return Unauthorized();
         }
 
-        var result = await eventService.GetInvitesAsync(userId.Value, id, cancellationToken);
-        return result.Status == EventOperationStatus.Success ? Ok(result.Value!.Select(item => new EventInviteResponse(item.Id, item.Email, item.Status, item.InvitedAtUtc, item.RespondedAtUtc)).ToArray()) : Map(result);
+        var result = await eventService.GetInvitesAsync(userId.Value, id, new PageQuery(paging.Page, paging.PageSize), cancellationToken);
+        if (result.Status != EventOperationStatus.Success) return Map(result);
+        var paged = result.Value!;
+        return Ok(new PagedResponse<EventInviteResponse>(paged.Items.Select(item => new EventInviteResponse(item.Id, item.Email, item.Status, item.InvitedAtUtc, item.RespondedAtUtc)).ToArray(), paged.TotalCount, paged.Page, paged.PageSize, paged.TotalPages, paged.HasNextPage, paged.HasPreviousPage));
     }
 
     [Authorize]
@@ -89,10 +93,13 @@ public class EventsController(IEventService eventService) : ControllerBase
 
     [Authorize]
     [HttpGet("{id:guid}/participants")]
-    public async Task<ActionResult<IReadOnlyCollection<EventParticipantResponse>>> GetParticipants(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResponse<EventParticipantResponse>>> GetParticipants(Guid id, [FromQuery] PageQueryParams paging, CancellationToken cancellationToken)
     {
-        var userId = CurrentUserId(); if (userId is null) return Unauthorized(); var result = await eventService.GetParticipantsAsync(userId.Value, id, cancellationToken);
-        return result.Status == EventOperationStatus.Success ? Ok(result.Value!.Select(item => new EventParticipantResponse(item.Id, item.Email, item.DisplayName, item.Status, item.AddedAtUtc)).ToArray()) : Map(result);
+        var userId = CurrentUserId(); if (userId is null) return Unauthorized();
+        var result = await eventService.GetParticipantsAsync(userId.Value, id, new PageQuery(paging.Page, paging.PageSize), cancellationToken);
+        if (result.Status != EventOperationStatus.Success) return Map(result);
+        var paged = result.Value!;
+        return Ok(new PagedResponse<EventParticipantResponse>(paged.Items.Select(item => new EventParticipantResponse(item.Id, item.Email, item.DisplayName, item.Status, item.AddedAtUtc)).ToArray(), paged.TotalCount, paged.Page, paged.PageSize, paged.TotalPages, paged.HasNextPage, paged.HasPreviousPage));
     }
 
     [Authorize]
@@ -113,7 +120,15 @@ public class EventsController(IEventService eventService) : ControllerBase
     private static EventCommand ToCommand(CreateEventRequest item) => new(item.Title, item.Description, item.CategoryId, item.Visibility, item.RequireApproval, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity);
     private static EventCommand ToCommand(UpdateEventRequest item) => new(item.Title, item.Description, item.CategoryId, item.Visibility, item.RequireApproval, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity);
     private static EventDetailResponse ToResponse(EventDetail item) => new(item.Id, item.OrganizerId, item.Title, item.Description, item.CategoryId, item.CategoryName, item.Visibility, item.RequireApproval, item.StartAtUtc, item.EndAtUtc, item.TimeZone, item.LocationName, item.LocationAddress, item.OnlineMeetingUrl, item.Capacity, item.Status);
-    private ActionResult Map(EventResult result) => result.Status switch { EventOperationStatus.BadRequest => BadRequest(result.Error), EventOperationStatus.Unauthorized => Unauthorized(), EventOperationStatus.Forbidden => Forbid(), EventOperationStatus.NotFound => result.Error is null ? NotFound() : NotFound(result.Error), EventOperationStatus.Conflict => Conflict(result.Error), _ => Problem(statusCode: 500) };
+    private ActionResult Map(EventResult result) => result.Status switch
+    {
+        EventOperationStatus.BadRequest => Problem(title: "Bad Request", detail: result.Error, statusCode: StatusCodes.Status400BadRequest),
+        EventOperationStatus.Unauthorized => Problem(title: "Unauthorized", statusCode: StatusCodes.Status401Unauthorized),
+        EventOperationStatus.Forbidden => Problem(title: "Forbidden", statusCode: StatusCodes.Status403Forbidden),
+        EventOperationStatus.NotFound => Problem(title: "Not Found", detail: result.Error, statusCode: StatusCodes.Status404NotFound),
+        EventOperationStatus.Conflict => Problem(title: "Conflict", detail: result.Error, statusCode: StatusCodes.Status409Conflict),
+        _ => Problem(statusCode: StatusCodes.Status500InternalServerError)
+    };
     private ActionResult Map<T>(EventResult<T> result) => Map((EventResult)result);
 }
 
@@ -130,3 +145,6 @@ public sealed record EventListItemResponse(Guid Id, string Title, Guid? Category
 public sealed record EventDetailResponse(Guid Id, Guid OrganizerId, string Title, string? Description, Guid? CategoryId, string? CategoryName, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
 public sealed record EventSummaryResponse(int ActiveEventCount, int AcceptedGuestCount, int WaitlistCount, double FillRate, IReadOnlyCollection<EventSummaryItemResponse> UpcomingEvents);
 public sealed record EventSummaryItemResponse(Guid Id, string Title, DateTime StartAtUtc, DateTime? EndAtUtc, string? LocationName, string? OnlineMeetingUrl, int Capacity, string Status, int AcceptedCount, int WaitlistCount);
+public sealed record EventListQueryParams(string? Search = null, string? Status = null, int Page = 1, int PageSize = 20);
+public sealed record PageQueryParams(int Page = 1, int PageSize = 20);
+public sealed record PagedResponse<T>(IReadOnlyCollection<T> Items, int TotalCount, int Page, int PageSize, int TotalPages, bool HasNextPage, bool HasPreviousPage);

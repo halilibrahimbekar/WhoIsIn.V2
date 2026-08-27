@@ -795,3 +795,41 @@ td a,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-row input[type="search"],
+.filter-row select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+.filter-row input[type="search"] {
+  flex: 1;
+  min-width: 160px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.table-footer {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #888;
+  text-align: right;
+}

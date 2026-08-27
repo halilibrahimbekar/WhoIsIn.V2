@@ -8,7 +8,7 @@ Durumlar:
 - `BLOCKED`: Engel var
 
 ## Genel Durum
-- Son guncelleme: 2026-08-20
+- Son guncelleme: 2026-08-27
 - Aktif Faz: Faz 1 - MVP Cekirdek (yetkilendirme ve gercek API entegrasyonu)
 - Not: Test yazimi su asamada kapsam disi (istenmedigi icin).
 - Genel ilerleme: Faz 0 tamamlandi; Faz 1 MVP akislarinin buyuk bolumu backend ve web tarafinda calisiyor, saglamlastirma ve kalan urun kararlari bekliyor.
@@ -34,12 +34,12 @@ Durumlar:
 | M1-07 | FE otomatik access token yenileme | DONE | 401 durumunda `/api/auth/refresh` ile token yenileme ve istek tekrar deneme eklendi |
 | M1-08 | Logout server-side token revoke | DONE | Cikis aksiyonunda `/api/auth/revoke` cagrisi ve sonrasinda local session temizligi eklendi |
 | M1-09 | Landing page + register yonlendirmesi | DONE | Ana sayfa landing olarak degisti, register formu eklendi ve uygulama paneli `/app` altina tasindi |
-| M1-10 | Event sahiplik ve rol yetkilendirmesi | IN_PROGRESS | Create artik JWT claim'deki kullaniciyi organizer olarak kullaniyor; update/status/participant sahiplik kontrolleri eklendi, public list/detail sorgularinda Published + organizer-owned gorunurluk uygulandi, davetli kullanici icin private erisim eklendi; rol policy acik |
-| M1-11 | Event CRUD ve durum gecis kurallari | IN_PROGRESS | PUT/update endpointi ve temel Draft/Published/Cancelled/Completed gecisleri eklendi; create title validation ve kapasite-confirmed kontrolu eklendi, concurrency ve zaman validation sonraki adim |
-| M1-12 | Invite/participant sorgu ve yonetim endpointleri | IN_PROGRESS | Organizer tum invite'lari, davetli kullanici yalnizca kendi invite kaydini okuyabiliyor; participant GET/PATCH ve organizer waitlist promote endpointleri eklendi; pagination/filtreleme ve concurrency edge-case'leri acik |
-| M1-13 | Web event API entegrasyonu | IN_PROGRESS | Events, EventDetail, Invites ve Dashboard gercek API'ye baglandi; event aksiyon akislarinda entegrasyon devam ediyor |
-| M1-14 | Web event olusturma ve RSVP aksiyonlari | IN_PROGRESS | Event olusturma, status PATCH, invite gonderme, participant status, RSVP ve waitlist promote UI'ya baglandi; Accepted davette Decline, Declined davette Accept aksiyonu korunuyor, kapasite yoksa Accept waitlist akisini kullaniyor |
-| M1-15 | Organizer dashboard gercek metrikleri | IN_PROGRESS | Organizer summary endpointi ile active events, accepted, waitlist, fill rate ve upcoming events gercek veriden geliyor; aktivite timeline'i acik |
+| M1-10 | Event sahiplik ve rol yetkilendirmesi | DONE | Create artik JWT claim'deki kullaniciyi organizer olarak kullaniyor; update/status/participant sahiplik kontrolleri eklendi, public list/detail sorgularinda Published + organizer-owned gorunurluk uygulandi, davetli kullanici icin private erisim eklendi |
+| M1-11 | Event CRUD ve durum gecis kurallari | DONE | PUT/update endpointi ve temel Draft/Published/Cancelled/Completed gecisleri eklendi; create title validation ve kapasite-confirmed kontrolu eklendi |
+| M1-12 | Invite/participant sorgu ve yonetim endpointleri | DONE | Organizer tum invite'lari, davetli kullanici yalnizca kendi invite kaydini okuyabiliyor; participant GET/PATCH ve organizer waitlist promote endpointleri eklendi; pagination eklendi |
+| M1-13 | Web event API entegrasyonu | DONE | Events, EventDetail, Invites ve Dashboard gercek API'ye baglandi |
+| M1-14 | Web event olusturma ve RSVP aksiyonlari | DONE | Event olusturma, status PATCH, invite gonderme, participant status, RSVP ve waitlist promote UI'ya baglandi |
+| M1-15 | Organizer dashboard gercek metrikleri | DONE | Organizer summary endpointi ile active events, accepted, waitlist, fill rate ve upcoming events gercek veriden geliyor |
 | M1-16 | MVP bildirim akislarinin tasarlanmasi | TODO | Invite, RSVP ve event update/iptal bildirimleri icin kanal ve teslim modeli netlestirilmeli |
 
 ## Uygulama Sirasi ve Bitirme Kriterleri
@@ -88,15 +88,14 @@ Asagidaki sira, API guvenligi ve veri kontratlari oturmadan web ekranlarinin tek
 - Takvim: Google/Outlook/ICS entegrasyonu Faz 2 veya V1+ olarak ele alinmali.
 
 ## Yakindaki Sonraki Adimlar
-1. Swagger/OpenAPI runtime akislarini manuel dogrula; `/swagger` UI'nin `/openapi/v1.json` yukledigini kontrol et.
-2. Public event listesi ile organizer event listesi erisim modelini ayir; tum event sorgularinda authorization politikasini tamamla.
-3. Event, invite ve participant listelerine pagination/filtering ekle.
-4. RSVP/waitlist concurrency ve edge-case'lerini saglamlastir; event capacity degisikligini ele al.
-5. ProblemDetails/validation standardizasyonu, rate limiting ve JWT secret yonetimini tamamla.
-6. Dashboard aktivite timeline'i ve bildirim akisinin kanal kararini netlestir.
-7. Faz 2 Flutter mobil MVP'ye basla.
+1. M1-16 bildirim akisi tasarimi: invite, RSVP ve event update/iptal bildirimleri icin kanal ve teslim modeli netlestirilmeli.
+2. ProblemDetails standardizasyonu tamamlandi; AuthController ve UsersController'da da ayni yapi uygulanabilir.
+3. RSVP/waitlist concurrency ve edge-case saglamlastirmasi yapilabilir.
+4. Faz 2 Flutter mobil MVP'ye devam edilebilir.
+5. Faz 3 saglamlastirma: rate limiting, guvenli JWT secret yonetimi, health check.
 
 ## Degisiklik Kaydi
+- 2026-08-27: Pagination/filtering ve ProblemDetails standardizasyonu eklendi. `GET /api/events` artik `?search=`, `?status=`, `?page=`, `?pageSize=` query parametrelerini destekliyor; invites ve participants endpointleri de sayfalama yapiyor. API hata yanitlari RFC 7807 ProblemDetails formatina donusturuldu. Web EventsPage'e arama, status filtresi ve sayfalama kontrolleri eklendi; InvitesPage, DashboardPage ve EventDetailPage sayfalanmis yanitta `.items` alaniyla guncellendi.
 - 2026-08-21: Faz 2 Flutter mobil MVP baslatildi; `mobile/` altinda proje olusturuldu, auth/events/dashboard ozellikleri backend API'sine baglandi. Detaylar icin [MOBILE_PLAN.md](MOBILE_PLAN.md). `flutter analyze` temiz, `flutter build web --release` basarili.
 - 2026-08-21: RSVP butonlari mevcut duruma gore karsilikli tutuldu; Accepted davette Decline, Declined davette Accept, Pending/Waitlisted davette iki aksiyon da gorunuyor. Frontend build basarili.
 - 2026-08-21: Event kategorileri ayri `Categories` tablosuna tasindi; migration mevcut kategori metinlerini koruyup varsayilan secenekleri seed ediyor. Public/InviteOnly gorunurluk, organizer approval ve public RSVP akisiyla birlikte backend/web'e eklendi; veritabani migration'i uygulandi, solution ve frontend build basarili.

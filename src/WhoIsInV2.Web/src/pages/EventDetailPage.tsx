@@ -71,7 +71,7 @@ export function EventDetailPage() {
       try {
         const response = await getEventParticipants(eventId)
         if (isMounted) {
-          setParticipants(response)
+          setParticipants(response.items)
         }
       } catch (error) {
         if (isMounted) {

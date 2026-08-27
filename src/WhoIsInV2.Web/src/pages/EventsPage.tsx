@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { createEvent, getCategories, getEvents, type Category, type EventListItem } from '../api/events'
+import { createEvent, getCategories, getEvents, type Category, type EventListItem, type PagedResponse } from '../api/events'
+
+const EVENT_STATUSES = ['', 'Draft', 'Published', 'Cancelled', 'Completed']
+const PAGE_SIZE = 20
 
 export function EventsPage() {
-  const [events, setEvents] = useState<EventListItem[]>([])
+  const [paged, setPaged] = useState<PagedResponse<EventListItem> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
   const [title, setTitle] = useState('')
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
@@ -27,10 +33,15 @@ export function EventsPage() {
     let isMounted = true
 
     async function loadEvents() {
+      setIsLoading(true)
+      setErrorMessage('')
       try {
-        const [response, categoryResponse] = await Promise.all([getEvents(), getCategories()])
+        const [response, categoryResponse] = await Promise.all([
+          getEvents({ search: search || undefined, status: statusFilter || undefined, page, pageSize: PAGE_SIZE }),
+          getCategories(),
+        ])
         if (isMounted) {
-          setEvents(response)
+          setPaged(response)
           setCategories(categoryResponse)
         }
       } catch (error) {
@@ -49,7 +60,13 @@ export function EventsPage() {
     return () => {
       isMounted = false
     }
-  }, [refreshKey])
+  }, [refreshKey, search, statusFilter, page])
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setPage(1)
+    setRefreshKey((value) => value + 1)
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -81,6 +98,7 @@ export function EventsPage() {
       setVisibility('Public')
       setRequireApproval(false)
       setIsCreateOpen(false)
+      setPage(1)
       setRefreshKey((value) => value + 1)
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not create event.')
@@ -88,6 +106,8 @@ export function EventsPage() {
       setIsCreating(false)
     }
   }
+
+  const events = paged?.items ?? []
 
   return (
     <section className="content-page">
@@ -156,38 +176,74 @@ export function EventsPage() {
       )}
 
       <div className="table-card">
+        <form className="filter-row" onSubmit={handleSearch}>
+          <input
+            type="search"
+            placeholder="Search events..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          />
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}>
+            {EVENT_STATUSES.map((s) => (
+              <option value={s} key={s}>{s || 'All statuses'}</option>
+            ))}
+          </select>
+        </form>
+
         {isLoading && <p>Loading events...</p>}
         {!isLoading && errorMessage && <p className="auth-error">{errorMessage}</p>}
         {!isLoading && !errorMessage && events.length === 0 && <p>No events found.</p>}
         {!isLoading && !errorMessage && events.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Event</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Capacity</th>
-                <th>Accepted</th>
-                <th>Waitlist</th>
-                <th>Open</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => (
-                <tr key={event.id}>
-                  <td>{event.title}<br /><small>{event.categoryName || 'Uncategorized'} | {event.visibility}</small></td>
-                  <td>{formatEventDate(event.startAtUtc, event.endAtUtc)}</td>
-                  <td>{event.status}</td>
-                  <td>{event.capacity}</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td>
-                    <Link to={`/app/events/${event.id}`}>Detail</Link>
-                  </td>
+          <>
+            <table>
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Capacity</th>
+                  <th>Open</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.id}>
+                    <td>{event.title}<br /><small>{event.categoryName || 'Uncategorized'} | {event.visibility}</small></td>
+                    <td>{formatEventDate(event.startAtUtc, event.endAtUtc)}</td>
+                    <td>{event.status}</td>
+                    <td>{event.capacity}</td>
+                    <td>
+                      <Link to={`/app/events/${event.id}`}>Detail</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {paged && paged.totalPages > 1 && (
+              <div className="pagination">
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  disabled={!paged.hasPreviousPage}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  ← Previous
+                </button>
+                <span>Page {paged.page} of {paged.totalPages} ({paged.totalCount} events)</span>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  disabled={!paged.hasNextPage}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+            {paged && paged.totalPages <= 1 && (
+              <p className="table-footer">{paged.totalCount} event{paged.totalCount !== 1 ? 's' : ''}</p>
+            )}
+          </>
         )}
       </div>
     </section>
@@ -202,3 +258,4 @@ function formatEventDate(startAtUtc: string, endAtUtc: string | null): string {
 
   return `${start} - ${new Date(endAtUtc).toLocaleTimeString()}`
 }
+

@@ -22,9 +22,9 @@ export function InvitesPage() {
       try {
         const response = await getEvents()
         if (isMounted) {
-          setEvents(response)
-          if (!selectedEventId && response.length > 0) {
-            setSearchParams({ eventId: response[0].id }, { replace: true })
+          setEvents(response.items)
+          if (!selectedEventId && response.items.length > 0) {
+            setSearchParams({ eventId: response.items[0].id }, { replace: true })
           }
         }
       } catch (error) {
@@ -57,7 +57,7 @@ export function InvitesPage() {
       try {
         const response = await getEventInvites(selectedEventId)
         if (isMounted) {
-          setInviteRows(response)
+          setInviteRows(response.items)
         }
       } catch (error) {
         if (isMounted) {

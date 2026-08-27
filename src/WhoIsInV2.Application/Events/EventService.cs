@@ -9,32 +9,53 @@ namespace WhoIsInV2.Application.Events;
 
 public interface IEventService
 {
-    Task<IReadOnlyCollection<EventListItem>> GetAllAsync(Guid? userId, CancellationToken cancellationToken);
+    Task<PagedResult<EventListItem>> GetAllAsync(Guid? userId, EventListQuery query, CancellationToken cancellationToken);
     Task<EventSummary> GetSummaryAsync(Guid organizerId, CancellationToken cancellationToken);
     Task<EventDetail?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken);
     Task<EventResult<EventDetail>> CreateAsync(Guid organizerId, EventCommand command, CancellationToken cancellationToken);
     Task<EventResult<EventDetail>> UpdateAsync(Guid organizerId, Guid id, EventCommand command, CancellationToken cancellationToken);
     Task<EventResult> UpdateStatusAsync(Guid organizerId, Guid id, string status, CancellationToken cancellationToken);
-    Task<EventResult<IReadOnlyCollection<EventInviteItem>>> GetInvitesAsync(Guid organizerId, Guid id, CancellationToken cancellationToken);
+    Task<EventResult<PagedResult<EventInviteItem>>> GetInvitesAsync(Guid organizerId, Guid id, PageQuery paging, CancellationToken cancellationToken);
     Task<EventResult<IReadOnlyCollection<EventInviteItem>>> InviteAsync(Guid organizerId, Guid id, IReadOnlyCollection<string> emails, CancellationToken cancellationToken);
     Task<EventResult<RsvpItem>> RsvpAsync(Guid userId, Guid id, string decision, CancellationToken cancellationToken);
-    Task<EventResult<IReadOnlyCollection<EventParticipantItem>>> GetParticipantsAsync(Guid organizerId, Guid id, CancellationToken cancellationToken);
+    Task<EventResult<PagedResult<EventParticipantItem>>> GetParticipantsAsync(Guid organizerId, Guid id, PageQuery paging, CancellationToken cancellationToken);
     Task<EventResult> UpdateParticipantStatusAsync(Guid organizerId, Guid id, Guid participantId, string status, CancellationToken cancellationToken);
     Task<EventResult> PromoteWaitlistedAsync(Guid organizerId, Guid id, CancellationToken cancellationToken);
 }
 
 public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 {
-    public async Task<IReadOnlyCollection<EventListItem>> GetAllAsync(Guid? userId, CancellationToken cancellationToken)
+    public async Task<PagedResult<EventListItem>> GetAllAsync(Guid? userId, EventListQuery query, CancellationToken cancellationToken)
     {
         var userEmail = await GetUserEmailAsync(userId, cancellationToken);
-        return await dbContext.Events.AsNoTracking()
+        var q = dbContext.Events.AsNoTracking()
             .Where(item => item.Status == EventStatus.Published && item.Visibility == EventVisibility.Public
                 || (userId.HasValue && item.OrganizerId == userId.Value)
-                || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail)))
-            .OrderBy(item => item.StartAtUtc)
+                || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail)));
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLower();
+            q = q.Where(item => item.Title.ToLower().Contains(search)
+                || (item.Description != null && item.Description.ToLower().Contains(search))
+                || (item.LocationName != null && item.LocationName.ToLower().Contains(search)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<EventStatus>(query.Status, true, out var statusFilter))
+        {
+            q = q.Where(item => item.Status == statusFilter);
+        }
+
+        var total = await q.CountAsync(cancellationToken);
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var items = await q.OrderBy(item => item.StartAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(item => new EventListItem(item.Id, item.Title, item.CategoryId, item.Category!.Name, item.Visibility.ToString(), item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString()))
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<EventListItem>(items, total, page, pageSize);
     }
 
     public async Task<EventSummary> GetSummaryAsync(Guid organizerId, CancellationToken cancellationToken)
@@ -130,22 +151,30 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         return EventResult.Success();
     }
 
-    public async Task<EventResult<IReadOnlyCollection<EventInviteItem>>> GetInvitesAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
+    public async Task<EventResult<PagedResult<EventInviteItem>>> GetInvitesAsync(Guid organizerId, Guid id, PageQuery paging, CancellationToken cancellationToken)
     {
         var entity = await dbContext.Events.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-        if (entity is null) return EventResult<IReadOnlyCollection<EventInviteItem>>.NotFound();
+        if (entity is null) return EventResult<PagedResult<EventInviteItem>>.NotFound();
 
         var userEmail = entity.OrganizerId == organizerId ? null : await GetUserEmailAsync(organizerId, cancellationToken);
         if (entity.OrganizerId != organizerId && userEmail is null)
         {
-            return EventResult<IReadOnlyCollection<EventInviteItem>>.Unauthorized();
+            return EventResult<PagedResult<EventInviteItem>>.Unauthorized();
         }
 
-        var invites = await dbContext.EventInvites.AsNoTracking()
+        var q = dbContext.EventInvites.AsNoTracking()
             .Where(item => item.EventId == id && (entity.OrganizerId == organizerId || item.Email == userEmail))
-            .OrderBy(item => item.Email)
+            .OrderBy(item => item.Email);
+
+        var total = await q.CountAsync(cancellationToken);
+        var page = Math.Max(1, paging.Page);
+        var pageSize = Math.Clamp(paging.PageSize, 1, 100);
+        var items = await q
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(item => new EventInviteItem(item.Id, item.Email, item.Status.ToString(), item.InvitedAtUtc, item.RespondedAtUtc)).ToListAsync(cancellationToken);
-        return EventResult<IReadOnlyCollection<EventInviteItem>>.Success(invites);
+
+        return EventResult<PagedResult<EventInviteItem>>.Success(new PagedResult<EventInviteItem>(items, total, page, pageSize));
     }
 
     public async Task<EventResult<IReadOnlyCollection<EventInviteItem>>> InviteAsync(Guid organizerId, Guid id, IReadOnlyCollection<string> emails, CancellationToken cancellationToken)
@@ -228,17 +257,23 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         return EventResult<RsvpItem>.Success(new RsvpItem(id, user.Email, invite?.Status.ToString() ?? "Accepted", participantStatus.ToString()));
     }
 
-    public async Task<EventResult<IReadOnlyCollection<EventParticipantItem>>> GetParticipantsAsync(Guid organizerId, Guid id, CancellationToken cancellationToken)
+    public async Task<EventResult<PagedResult<EventParticipantItem>>> GetParticipantsAsync(Guid organizerId, Guid id, PageQuery paging, CancellationToken cancellationToken)
     {
         var ownership = await CheckOwnershipAsync(organizerId, id, cancellationToken);
         if (ownership is not null)
         {
-            return EventResult<IReadOnlyCollection<EventParticipantItem>>.From(ownership);
+            return EventResult<PagedResult<EventParticipantItem>>.From(ownership);
         }
 
-        var participants = await dbContext.EventParticipants.AsNoTracking().Where(item => item.EventId == id).OrderBy(item => item.AddedAtUtc)
+        var q = dbContext.EventParticipants.AsNoTracking().Where(item => item.EventId == id).OrderBy(item => item.AddedAtUtc);
+        var total = await q.CountAsync(cancellationToken);
+        var page = Math.Max(1, paging.Page);
+        var pageSize = Math.Clamp(paging.PageSize, 1, 100);
+        var participants = await q
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(item => new EventParticipantItem(item.Id, item.Email, item.DisplayName, item.Status.ToString(), item.AddedAtUtc)).ToListAsync(cancellationToken);
-        return EventResult<IReadOnlyCollection<EventParticipantItem>>.Success(participants);
+        return EventResult<PagedResult<EventParticipantItem>>.Success(new PagedResult<EventParticipantItem>(participants, total, page, pageSize));
     }
 
     public async Task<EventResult> UpdateParticipantStatusAsync(Guid organizerId, Guid id, Guid participantId, string status, CancellationToken cancellationToken)
@@ -356,6 +391,14 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 }
 
 public sealed record EventCommand(string Title, string? Description, Guid? CategoryId, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
+public sealed record EventListQuery(int Page = 1, int PageSize = 20, string? Search = null, string? Status = null);
+public sealed record PageQuery(int Page = 1, int PageSize = 20);
+public sealed record PagedResult<T>(IReadOnlyCollection<T> Items, int TotalCount, int Page, int PageSize)
+{
+    public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+}
 public sealed record EventListItem(Guid Id, string Title, Guid? CategoryId, string? CategoryName, string Visibility, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
 public sealed record EventDetail(Guid Id, Guid OrganizerId, string Title, string? Description, Guid? CategoryId, string? CategoryName, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
 public sealed record EventSummary(int ActiveEventCount, int AcceptedGuestCount, int WaitlistCount, double FillRate, IReadOnlyCollection<EventSummaryItem> UpcomingEvents);
