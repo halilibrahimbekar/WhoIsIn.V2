@@ -8,6 +8,7 @@ import { EventDetailPage } from './pages/EventDetailPage'
 import { EventsPage } from './pages/EventsPage'
 import { InvitesPage } from './pages/InvitesPage'
 import { LandingPage } from './pages/LandingPage'
+import { NotificationsPage } from './pages/NotificationsPage'
 
 function App() {
   const { isInitializing, user } = useAuth()
@@ -25,6 +26,7 @@ function App() {
         <Route path="events" element={<EventsPage />} />
         <Route path="events/:eventId" element={<EventDetailPage />} />
         <Route path="invites" element={<InvitesPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

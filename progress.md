@@ -95,6 +95,7 @@ Asagidaki sira, API guvenligi ve veri kontratlari oturmadan web ekranlarinin tek
 5. Faz 3 saglamlastirma: rate limiting, guvenli JWT secret yonetimi, health check.
 
 ## Degisiklik Kaydi
+- 2026-08-27: Flutter Web Chrome istekleri icin API CORS policy'si development ortaminda localhost, 127.0.0.1 ve IPv6 loopback originlerinin farkli portlarini kabul edecek sekilde genisletildi. Solution build basarili.
 - 2026-08-27: Pagination/filtering ve ProblemDetails standardizasyonu eklendi. `GET /api/events` artik `?search=`, `?status=`, `?page=`, `?pageSize=` query parametrelerini destekliyor; invites ve participants endpointleri de sayfalama yapiyor. API hata yanitlari RFC 7807 ProblemDetails formatina donusturuldu. Web EventsPage'e arama, status filtresi ve sayfalama kontrolleri eklendi; InvitesPage, DashboardPage ve EventDetailPage sayfalanmis yanitta `.items` alaniyla guncellendi.
 - 2026-08-21: Faz 2 Flutter mobil MVP baslatildi; `mobile/` altinda proje olusturuldu, auth/events/dashboard ozellikleri backend API'sine baglandi. Detaylar icin [MOBILE_PLAN.md](MOBILE_PLAN.md). `flutter analyze` temiz, `flutter build web --release` basarili.
 - 2026-08-21: RSVP butonlari mevcut duruma gore karsilikli tutuldu; Accepted davette Decline, Declined davette Accept, Pending/Waitlisted davette iki aksiyon da gorunuyor. Frontend build basarili.

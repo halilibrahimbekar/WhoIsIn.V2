@@ -5,6 +5,7 @@ const navItems = [
   { to: '/app', label: 'Dashboard', end: true },
   { to: '/app/events', label: 'Events' },
   { to: '/app/invites', label: 'Invites' },
+  { to: '/app/notifications', label: 'Notifications' },
 ]
 
 export function AppLayout() {

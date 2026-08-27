@@ -10,6 +10,8 @@ import '../../features/events/models/event_models.dart';
 import '../../features/events/presentation/event_detail_page.dart';
 import '../../features/events/presentation/event_form_page.dart';
 import '../../features/events/presentation/events_list_page.dart';
+import '../../features/invites/presentation/invites_page.dart';
+import '../../features/notifications/presentation/notifications_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authNotifier = ValueNotifier<int>(0);
@@ -36,6 +38,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (context, state) => const RegisterPage()),
       GoRoute(path: '/', builder: (context, state) => const DashboardPage()),
       GoRoute(path: '/events', builder: (context, state) => const EventsListPage()),
+      GoRoute(path: '/invites', builder: (context, state) => const InvitesPage()),
+      GoRoute(path: '/notifications', builder: (context, state) => const NotificationsPage()),
       GoRoute(path: '/events/new', builder: (context, state) => const EventFormPage()),
       GoRoute(
         path: '/events/:id',

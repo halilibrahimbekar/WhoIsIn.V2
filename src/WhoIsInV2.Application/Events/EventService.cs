@@ -52,7 +52,7 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
         var items = await q.OrderBy(item => item.StartAtUtc)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(item => new EventListItem(item.Id, item.Title, item.CategoryId, item.Category!.Name, item.Visibility.ToString(), item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString()))
+            .Select(item => new EventListItem(item.Id, item.OrganizerId, item.Title, item.CategoryId, item.Category!.Name, item.Visibility.ToString(), item.StartAtUtc, item.EndAtUtc, item.Capacity, item.Status.ToString()))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<EventListItem>(items, total, page, pageSize);
@@ -60,14 +60,25 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 
     public async Task<EventSummary> GetSummaryAsync(Guid organizerId, CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
         var events = await dbContext.Events.AsNoTracking().Where(item => item.OrganizerId == organizerId).OrderBy(item => item.StartAtUtc)
             .Select(item => new EventSummaryItem(item.Id, item.Title, item.StartAtUtc, item.EndAtUtc, item.LocationName, item.OnlineMeetingUrl, item.Capacity, item.Status.ToString(),
                 item.Participants.Count(participant => participant.Status == ParticipantStatus.Confirmed), item.Participants.Count(participant => participant.Status == ParticipantStatus.Waitlisted))).ToListAsync(cancellationToken);
-        var accepted = events.Sum(item => item.AcceptedCount);
-        var waitlisted = events.Sum(item => item.WaitlistCount);
-        var capacity = events.Sum(item => item.Capacity);
+
+        // Fill rate reflects only currently active (published, not yet ended) events, so past/cancelled/draft events don't skew it.
+        var activeEvents = events.Where(item => item.Status == nameof(EventStatus.Published) && (item.EndAtUtc ?? item.StartAtUtc) >= now).ToList();
+        var accepted = activeEvents.Sum(item => item.AcceptedCount);
+        var waitlisted = activeEvents.Sum(item => item.WaitlistCount);
+        var capacity = activeEvents.Sum(item => item.Capacity);
+
+        var upcoming = events
+            .Where(item => item.StartAtUtc >= now && item.Status != nameof(EventStatus.Cancelled))
+            .OrderBy(item => item.StartAtUtc)
+            .Take(5)
+            .ToArray();
+
         return new EventSummary(events.Count(item => item.Status is nameof(EventStatus.Draft) or nameof(EventStatus.Published)), accepted, waitlisted,
-            capacity == 0 ? 0 : Math.Round(accepted * 100d / capacity, 1), events.Take(5).ToArray());
+            capacity == 0 ? 0 : Math.Round(accepted * 100d / capacity, 1), upcoming);
     }
 
     public async Task<EventDetail?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken)
@@ -78,7 +89,7 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
                 && (item.Status == EventStatus.Published && item.Visibility == EventVisibility.Public
                     || (userId.HasValue && item.OrganizerId == userId.Value)
                     || (userEmail != null && item.Invites.Any(invite => invite.Email == userEmail))))
-            .Select(ToDetail())
+            .Select(ToDetail(userEmail))
             .SingleOrDefaultAsync(cancellationToken);
     }
 
@@ -386,8 +397,10 @@ public sealed class EventService(IWhoIsInV2DbContext dbContext) : IEventService
 
     private static string? Validate(EventCommand command, bool requireTitle) => requireTitle && string.IsNullOrWhiteSpace(command.Title) ? "Title is required." : command.Capacity <= 0 ? "Capacity must be greater than zero." : command.EndAtUtc is not null && command.EndAtUtc <= command.StartAtUtc ? "EndAtUtc must be greater than StartAtUtc." : null;
     private static bool IsValidStatusTransition(EventStatus current, EventStatus next) => current == next || current switch { EventStatus.Draft => next is EventStatus.Published or EventStatus.Cancelled, EventStatus.Published => next is EventStatus.Cancelled or EventStatus.Completed, _ => false };
-    private static EventDetail ToDetail(Event entity) => new(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.CategoryId, entity.Category?.Name, entity.Visibility.ToString(), entity.RequireApproval, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString());
-    private static System.Linq.Expressions.Expression<Func<Event, EventDetail>> ToDetail() => entity => new EventDetail(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.CategoryId, entity.Category!.Name, entity.Visibility.ToString(), entity.RequireApproval, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString());
+    private static EventDetail ToDetail(Event entity) => new(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.CategoryId, entity.Category?.Name, entity.Visibility.ToString(), entity.RequireApproval, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString(), null, null);
+    private static System.Linq.Expressions.Expression<Func<Event, EventDetail>> ToDetail(string? userEmail) => entity => new EventDetail(entity.Id, entity.OrganizerId, entity.Title, entity.Description, entity.CategoryId, entity.Category!.Name, entity.Visibility.ToString(), entity.RequireApproval, entity.StartAtUtc, entity.EndAtUtc, entity.TimeZone, entity.LocationName, entity.LocationAddress, entity.OnlineMeetingUrl, entity.Capacity, entity.Status.ToString(),
+        userEmail == null ? null : entity.Participants.Where(participant => participant.Email == userEmail).Select(participant => (string?)participant.Status.ToString()).FirstOrDefault(),
+        userEmail == null ? null : entity.Invites.Where(invite => invite.Email == userEmail).Select(invite => (string?)invite.Status.ToString()).FirstOrDefault());
 }
 
 public sealed record EventCommand(string Title, string? Description, Guid? CategoryId, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity);
@@ -399,8 +412,8 @@ public sealed record PagedResult<T>(IReadOnlyCollection<T> Items, int TotalCount
     public bool HasNextPage => Page < TotalPages;
     public bool HasPreviousPage => Page > 1;
 }
-public sealed record EventListItem(Guid Id, string Title, Guid? CategoryId, string? CategoryName, string Visibility, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
-public sealed record EventDetail(Guid Id, Guid OrganizerId, string Title, string? Description, Guid? CategoryId, string? CategoryName, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status);
+public sealed record EventListItem(Guid Id, Guid OrganizerId, string Title, Guid? CategoryId, string? CategoryName, string Visibility, DateTime StartAtUtc, DateTime? EndAtUtc, int Capacity, string Status);
+public sealed record EventDetail(Guid Id, Guid OrganizerId, string Title, string? Description, Guid? CategoryId, string? CategoryName, string Visibility, bool RequireApproval, DateTime StartAtUtc, DateTime? EndAtUtc, string TimeZone, string? LocationName, string? LocationAddress, string? OnlineMeetingUrl, int Capacity, string Status, string? MyParticipantStatus, string? MyInviteStatus);
 public sealed record EventSummary(int ActiveEventCount, int AcceptedGuestCount, int WaitlistCount, double FillRate, IReadOnlyCollection<EventSummaryItem> UpcomingEvents);
 public sealed record EventSummaryItem(Guid Id, string Title, DateTime StartAtUtc, DateTime? EndAtUtc, string? LocationName, string? OnlineMeetingUrl, int Capacity, string Status, int AcceptedCount, int WaitlistCount);
 public sealed record EventInviteItem(Guid Id, string Email, string Status, DateTime InvitedAtUtc, DateTime? RespondedAtUtc);

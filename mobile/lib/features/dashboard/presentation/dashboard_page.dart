@@ -20,6 +20,14 @@ class DashboardPage extends ConsumerWidget {
         title: const Text('Panel'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.mail_outline),
+            onPressed: () => context.push('/invites'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none),
+            onPressed: () => context.push('/notifications'),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => ref.read(authControllerProvider.notifier).logout(),
           ),
@@ -82,7 +90,7 @@ class _DashboardBody extends StatelessWidget {
         Row(
           children: [
             Expanded(child: _MetricCard(label: 'Bekleme Listesi', value: summary.waitlistCount.toString())),
-            Expanded(child: _MetricCard(label: 'Doluluk', value: '${(summary.fillRate * 100).toStringAsFixed(0)}%')),
+            Expanded(child: _MetricCard(label: 'Doluluk', value: '${summary.fillRate.toStringAsFixed(0)}%')),
           ],
         ),
         const SizedBox(height: 24),

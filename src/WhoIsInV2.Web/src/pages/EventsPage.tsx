@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { createEvent, getCategories, getEvents, type Category, type EventListItem, type PagedResponse } from '../api/events'
+import { useAuth } from '../auth/AuthContext'
 
 const EVENT_STATUSES = ['', 'Draft', 'Published', 'Cancelled', 'Completed']
 const PAGE_SIZE = 20
 
 export function EventsPage() {
+  const { user } = useAuth()
   const [paged, setPaged] = useState<PagedResponse<EventListItem> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -28,6 +30,21 @@ export function EventsPage() {
   const [categoryId, setCategoryId] = useState('')
   const [visibility, setVisibility] = useState('Public')
   const [requireApproval, setRequireApproval] = useState(false)
+
+  useEffect(() => {
+    if (!isCreateOpen) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsCreateOpen(false)
+    }
+
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = ''
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isCreateOpen])
 
   useEffect(() => {
     let isMounted = true
@@ -108,6 +125,8 @@ export function EventsPage() {
   }
 
   const events = paged?.items ?? []
+  const ownedEvents = events.filter((event) => event.organizerId === user?.id)
+  const invitedEvents = events.filter((event) => event.organizerId !== user?.id)
 
   return (
     <section className="content-page">
@@ -120,11 +139,22 @@ export function EventsPage() {
       </header>
 
       {isCreateOpen && (
-        <form className="auth-form table-card" onSubmit={handleCreate}>
-          <h2>Create event</h2>
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setIsCreateOpen(false)}>
+          <form
+            className="auth-form modal-panel"
+            onSubmit={handleCreate}
+            onMouseDown={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-event-title"
+          >
+          <div className="modal-header">
+            <h2 id="create-event-title">Create event</h2>
+            <button type="button" className="modal-close" aria-label="Close create event form" onClick={() => setIsCreateOpen(false)}>&times;</button>
+          </div>
           <label>
             Title
-            <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+            <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required />
           </label>
           <label>
             Description
@@ -172,7 +202,8 @@ export function EventsPage() {
           <button type="submit" className="primary-btn" disabled={isCreating}>
             {isCreating ? 'Creating...' : 'Create event'}
           </button>
-        </form>
+          </form>
+        </div>
       )}
 
       <div className="table-card">
@@ -195,30 +226,8 @@ export function EventsPage() {
         {!isLoading && !errorMessage && events.length === 0 && <p>No events found.</p>}
         {!isLoading && !errorMessage && events.length > 0 && (
           <>
-            <table>
-              <thead>
-                <tr>
-                  <th>Event</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Capacity</th>
-                  <th>Open</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((event) => (
-                  <tr key={event.id}>
-                    <td>{event.title}<br /><small>{event.categoryName || 'Uncategorized'} | {event.visibility}</small></td>
-                    <td>{formatEventDate(event.startAtUtc, event.endAtUtc)}</td>
-                    <td>{event.status}</td>
-                    <td>{event.capacity}</td>
-                    <td>
-                      <Link to={`/app/events/${event.id}`}>Detail</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <EventTable title="Your events" events={ownedEvents} />
+            <EventTable title="Invited and public events" events={invitedEvents} />
             {paged && paged.totalPages > 1 && (
               <div className="pagination">
                 <button
@@ -248,6 +257,21 @@ export function EventsPage() {
       </div>
     </section>
   )
+}
+
+function EventTable({ title, events }: { title: string; events: EventListItem[] }) {
+  return <section className="table-section">
+    <h2>{title}</h2>
+    {events.length === 0 ? <p>No events in this section.</p> : <table>
+      <thead><tr><th>Event</th><th>Date</th><th>Status</th><th>Capacity</th><th>Open</th></tr></thead>
+      <tbody>{events.map((event) => <tr key={event.id}>
+        <td>{event.title}<br /><small>{event.categoryName || 'Uncategorized'} | {event.visibility}</small></td>
+        <td>{formatEventDate(event.startAtUtc, event.endAtUtc)}</td>
+        <td>{event.status}</td><td>{event.capacity}</td>
+        <td><Link to={`/app/events/${event.id}`}>Detail</Link></td>
+      </tr>)}</tbody>
+    </table>}
+  </section>
 }
 
 function formatEventDate(startAtUtc: string, endAtUtc: string | null): string {

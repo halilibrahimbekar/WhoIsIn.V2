@@ -56,7 +56,8 @@ class EventsRepository {
   Future<List<EventListItem>> getAll() async {
     try {
       final response = await _dio.get('/api/events');
-      return (response.data as List<dynamic>)
+      final data = response.data as Map<String, dynamic>;
+      return (data['items'] as List<dynamic>)
           .map((item) => EventListItem.fromJson(item as Map<String, dynamic>))
           .toList();
     } on DioException catch (error) {
@@ -111,7 +112,8 @@ class EventsRepository {
   Future<List<EventInvite>> getInvites(String eventId) async {
     try {
       final response = await _dio.get('/api/events/$eventId/invites');
-      return (response.data as List<dynamic>)
+      final data = response.data as Map<String, dynamic>;
+      return (data['items'] as List<dynamic>)
           .map((item) => EventInvite.fromJson(item as Map<String, dynamic>))
           .toList();
     } on DioException catch (error) {
@@ -141,7 +143,8 @@ class EventsRepository {
   Future<List<EventParticipant>> getParticipants(String eventId) async {
     try {
       final response = await _dio.get('/api/events/$eventId/participants');
-      return (response.data as List<dynamic>)
+      final data = response.data as Map<String, dynamic>;
+      return (data['items'] as List<dynamic>)
           .map((item) => EventParticipant.fromJson(item as Map<String, dynamic>))
           .toList();
     } on DioException catch (error) {

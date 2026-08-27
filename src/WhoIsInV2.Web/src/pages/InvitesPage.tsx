@@ -140,7 +140,8 @@ export function InvitesPage() {
               </tr>
             </thead>
             <tbody>
-              {inviteRows.map((row) => (
+              <tr><th colSpan={5}>Davet Edildikleriniz</th></tr>
+              {inviteRows.filter((row) => user?.email === row.email).map((row) => (
                 <tr key={row.id}>
                   <td>{row.email}</td>
                   <td>{row.status}</td>
@@ -156,6 +157,18 @@ export function InvitesPage() {
                       </button>}
                     </> : <span>Organizer view</span>}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+            <tbody>
+              <tr><th colSpan={5}>Davet Ettikleriniz</th></tr>
+              {inviteRows.filter((row) => user?.email !== row.email).map((row) => (
+                <tr key={row.id}>
+                  <td>{row.email}</td>
+                  <td>{row.status}</td>
+                  <td>{new Date(row.invitedAtUtc).toLocaleString()}</td>
+                  <td>{row.respondedAtUtc ? new Date(row.respondedAtUtc).toLocaleString() : '-'}</td>
+                  <td><span>Organizer view</span></td>
                 </tr>
               ))}
             </tbody>

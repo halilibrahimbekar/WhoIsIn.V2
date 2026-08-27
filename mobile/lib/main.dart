@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/application/auth_controller.dart';
 
 void main() {
@@ -20,7 +21,7 @@ class WhoIsInApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'WhoIsIn',
       routerConfig: router,
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+      theme: AppTheme.light(),
     );
   }
 }

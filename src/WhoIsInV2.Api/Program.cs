@@ -1,8 +1,10 @@
 using System.Text;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+
 using Serilog;
-using Swashbuckle.AspNetCore.SwaggerUI;
+
 using WhoIsInV2.Api.Auth;
 using WhoIsInV2.Application.Authentication;
 using WhoIsInV2.Application.Common.Interfaces;
@@ -19,7 +21,14 @@ try
     builder.Services.AddControllers();
     builder.Services.AddProblemDetails();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddCors(options => options.AddPolicy("WebDev", policy => policy.WithOrigins("http://localhost:5173", "https://localhost:5173").AllowAnyHeader().AllowAnyMethod()));
+    builder.Services.AddCors(options =>
+        options.AddPolicy("WebDev", policy =>
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return false;
+                return uri.Host is "localhost" or "127.0.0.1" or "[::1]";
+            }).AllowAnyHeader().AllowAnyMethod()));
+
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
     builder.Services.AddScoped<IAccessTokenService, JwtTokenService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
@@ -31,9 +40,16 @@ try
     if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Length < 32) throw new InvalidOperationException("Jwt signing key must be configured and at least 32 characters long.");
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = true, ValidIssuer = jwtOptions.Issuer, ValidateAudience = true, ValidAudience = jwtOptions.Audience, ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)), ValidateLifetime = true, ClockSkew = TimeSpan.FromSeconds(30)
+        ValidateIssuer = true,
+        ValidIssuer = jwtOptions.Issuer,
+        ValidateAudience = true,
+        ValidAudience = jwtOptions.Audience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromSeconds(30)
     });
+
     builder.Services.AddAuthorization();
     builder.Services.AddOpenApi();
     builder.Services.AddInfrastructure(builder.Configuration);

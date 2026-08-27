@@ -2,6 +2,7 @@ import { apiFetch } from './client'
 
 export interface EventListItem {
   id: string
+  organizerId: string
   title: string
   categoryId: string | null
   categoryName: string | null

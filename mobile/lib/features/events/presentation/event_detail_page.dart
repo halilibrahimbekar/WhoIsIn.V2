@@ -28,6 +28,14 @@ class EventDetailPage extends ConsumerWidget {
   }
 }
 
+String _participantStatusLabel(String status) => switch (status) {
+      'Confirmed' => 'Kabul edildi',
+      'Waitlisted' => 'Bekleme listesinde',
+      'Declined' => 'Reddedildi',
+      'PendingApproval' => 'Onay bekliyor',
+      _ => status,
+    };
+
 class _EventDetailBody extends ConsumerWidget {
   const _EventDetailBody({required this.event});
 
@@ -72,12 +80,12 @@ class _EventDetailBody extends ConsumerWidget {
         Text('Kapasite: ${event.capacity}'),
         const SizedBox(height: 24),
         if (isOrganizer) _OrganizerActions(event: event, onAction: (action) => _runAction(context, ref, action)),
-        if (!isOrganizer)
+        if (!isOrganizer && event.canRespond)
           Row(
             children: [
               FilledButton(
                 onPressed: () => _runAction(context, ref, () => ref.read(eventsRepositoryProvider).rsvp(event.id, 'Accepted')),
-                child: const Text('Kabul Et'),
+                child: const Text('Request Participant'),
               ),
               const SizedBox(width: 12),
               OutlinedButton(
@@ -86,6 +94,8 @@ class _EventDetailBody extends ConsumerWidget {
               ),
             ],
           ),
+        if (!isOrganizer && !event.canRespond && event.myParticipantStatus != null)
+          Chip(label: Text('Katilim durumun: ${_participantStatusLabel(event.myParticipantStatus!)}')),
         const SizedBox(height: 24),
         if (isOrganizer) ...[
           Text('Davetler', style: Theme.of(context).textTheme.titleMedium),

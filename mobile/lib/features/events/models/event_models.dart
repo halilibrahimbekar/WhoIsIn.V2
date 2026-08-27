@@ -1,6 +1,7 @@
 class EventListItem {
   EventListItem({
     required this.id,
+    required this.organizerId,
     required this.title,
     required this.categoryId,
     required this.categoryName,
@@ -13,6 +14,7 @@ class EventListItem {
 
   factory EventListItem.fromJson(Map<String, dynamic> json) => EventListItem(
         id: json['id'] as String,
+        organizerId: json['organizerId'] as String,
         title: json['title'] as String,
         categoryId: json['categoryId'] as String?,
         categoryName: json['categoryName'] as String?,
@@ -24,6 +26,7 @@ class EventListItem {
       );
 
   final String id;
+  final String organizerId;
   final String title;
   final String? categoryId;
   final String? categoryName;
@@ -52,6 +55,8 @@ class EventDetail {
     required this.onlineMeetingUrl,
     required this.capacity,
     required this.status,
+    this.myParticipantStatus,
+    this.myInviteStatus,
   });
 
   factory EventDetail.fromJson(Map<String, dynamic> json) => EventDetail(
@@ -71,6 +76,8 @@ class EventDetail {
         onlineMeetingUrl: json['onlineMeetingUrl'] as String?,
         capacity: json['capacity'] as int,
         status: json['status'] as String,
+        myParticipantStatus: json['myParticipantStatus'] as String?,
+        myInviteStatus: json['myInviteStatus'] as String?,
       );
 
   final String id;
@@ -89,6 +96,14 @@ class EventDetail {
   final String? onlineMeetingUrl;
   final int capacity;
   final String status;
+  final String? myParticipantStatus;
+  final String? myInviteStatus;
+
+  /// Whether the current (non-organizer) user can still respond to this event.
+  bool get canRespond =>
+      status == 'Published' &&
+      myParticipantStatus == null &&
+      (visibility == 'Public' || myInviteStatus == 'Pending');
 }
 
 class EventInvite {
