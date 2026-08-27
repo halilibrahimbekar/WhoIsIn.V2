@@ -16,7 +16,7 @@ export function DashboardPage() {
         const [response, eventResponse] = await Promise.all([getEventSummary(), getEvents()])
         if (isMounted) {
           setSummary(response)
-          setEvents(eventResponse)
+          setEvents(eventResponse.items)
         }
       } catch (error) {
         if (isMounted) {

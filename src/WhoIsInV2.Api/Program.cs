@@ -17,6 +17,7 @@ try
     var builder = WebApplication.CreateBuilder(args);
     builder.Host.UseSerilog((context, services, configuration) => configuration.ReadFrom.Configuration(context.Configuration).ReadFrom.Services(services).Enrich.FromLogContext().WriteTo.Console());
     builder.Services.AddControllers();
+    builder.Services.AddProblemDetails();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddCors(options => options.AddPolicy("WebDev", policy => policy.WithOrigins("http://localhost:5173", "https://localhost:5173").AllowAnyHeader().AllowAnyMethod()));
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
