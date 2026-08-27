@@ -1,3 +1,4 @@
+import '../../../core/localization/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,7 +30,7 @@ class NotificationsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-        appBar: AppBar(title: const Text('Bildirimler')),
+        appBar: AppBar(title: Text(AppLocalizations.of(context).text('notifications'))),
         body: ref.watch(notificationsProvider).when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text(error.toString())),

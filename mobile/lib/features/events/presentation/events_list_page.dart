@@ -6,17 +6,19 @@ import 'package:intl/intl.dart';
 import '../application/events_providers.dart';
 import '../models/event_models.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../../core/localization/app_localizations.dart';
 
 class EventsListPage extends ConsumerWidget {
   const EventsListPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+      final strings = AppLocalizations.of(context);
     final eventsAsync = ref.watch(eventsListProvider);
     final currentUser = ref.watch(authControllerProvider).valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Etkinlikler')),
+      appBar: AppBar(title: Text(strings.text('events'))),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/events/new'),
         child: const Icon(Icons.add),
@@ -41,13 +43,14 @@ class _EventsListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     if (events.isEmpty) {
       return LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: SizedBox(
             height: constraints.maxHeight,
-            child: const Center(child: Text('Henuz etkinlik yok.')),
+            child: Center(child: Text(strings.text('noEvents'))),
           ),
         ),
       );
@@ -79,6 +82,7 @@ class _EventSection extends StatelessWidget {
         Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         if (events.isEmpty) const Text('Etkinlik yok.'),
+          if (events.isEmpty) Text(AppLocalizations.of(context).text('noEvents')),
         ...events.map((event) => Card(child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.w700)),

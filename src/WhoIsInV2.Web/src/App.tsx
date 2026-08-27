@@ -9,16 +9,18 @@ import { EventsPage } from './pages/EventsPage'
 import { InvitesPage } from './pages/InvitesPage'
 import { LandingPage } from './pages/LandingPage'
 import { NotificationsPage } from './pages/NotificationsPage'
+import { LanguageSelector, useI18n } from './i18n'
 
 function App() {
   const { isInitializing, user } = useAuth()
+  const { t } = useI18n()
 
   if (isInitializing) {
-    return <div className="boot-screen">Checking session...</div>
+    return <div className="boot-screen"><LanguageSelector /><p>{t('checkingSession')}</p></div>
   }
 
   return (
-    <Routes>
+    <><LanguageSelector /><Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
       <Route path="/app" element={user ? <AppLayout /> : <Navigate to="/auth" replace />}>
@@ -29,7 +31,7 @@ function App() {
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></>
   )
 }
 

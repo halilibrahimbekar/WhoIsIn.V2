@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getEventSummary, getEvents, type EventListItem, type EventSummary } from '../api/events'
+import { useI18n } from '../i18n'
 
 export function DashboardPage() {
+  const { language, t } = useI18n()
   const [summary, setSummary] = useState<EventSummary | null>(null)
   const [events, setEvents] = useState<EventListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -38,10 +40,10 @@ export function DashboardPage() {
 
   const metrics = summary
     ? [
-        { label: 'Active events', value: summary.activeEventCount.toLocaleString() },
-        { label: 'Accepted guests', value: summary.acceptedGuestCount.toLocaleString() },
-        { label: 'Waitlist', value: summary.waitlistCount.toLocaleString() },
-        { label: 'Fill rate', value: `${summary.fillRate}%` },
+        { label: language === 'tr' ? 'Aktif etkinlik' : 'Active events', value: summary.activeEventCount.toLocaleString() },
+        { label: language === 'tr' ? 'Kabul edilen konuk' : 'Accepted guests', value: summary.acceptedGuestCount.toLocaleString() },
+        { label: language === 'tr' ? 'Bekleme listesi' : 'Waitlist', value: summary.waitlistCount.toLocaleString() },
+        { label: language === 'tr' ? 'Doluluk oranı' : 'Fill rate', value: `${summary.fillRate}%` },
       ]
     : []
 
@@ -56,7 +58,7 @@ export function DashboardPage() {
       </header>
 
       <section className="metric-grid" aria-label="Summary metrics">
-        {isLoading && <p>Loading dashboard...</p>}
+        {isLoading && <p>{t('loading')}</p>}
         {!isLoading && errorMessage && <p className="auth-error">{errorMessage}</p>}
         {!isLoading && !errorMessage && metrics.map((item) => (
           <article className="metric-card" key={item.label}>
@@ -68,11 +70,11 @@ export function DashboardPage() {
 
       <section className="board" aria-label="Upcoming events">
         <div className="board-header">
-          <h2>Upcoming Events</h2>
-          <Link to="/app/events">See all</Link>
+          <h2>{language === 'tr' ? 'Yaklaşan etkinlikler' : 'Upcoming Events'}</h2>
+          <Link to="/app/events">{t('seeAll')}</Link>
         </div>
         <div className="event-list">
-          {!isLoading && !errorMessage && events.length === 0 && <p>No upcoming events.</p>}
+          {!isLoading && !errorMessage && events.length === 0 && <p>{t('noUpcomingEvents')}</p>}
           {events.map((event) => (
             <article className="event-card" key={event.id}>
               <div>
@@ -82,7 +84,7 @@ export function DashboardPage() {
                 </p>
               </div>
               <div className="event-side">
-                <p>{event.capacity} places</p>
+                <p>{event.capacity} {t('places')}</p>
                 <span>{event.status}</span>
               </div>
             </article>

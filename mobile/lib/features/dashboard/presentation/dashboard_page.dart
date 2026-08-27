@@ -6,18 +6,20 @@ import 'package:intl/intl.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../events/application/events_providers.dart';
 import '../../events/models/event_models.dart';
+import '../../../core/localization/app_localizations.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final strings = AppLocalizations.of(context);
     final summaryAsync = ref.watch(eventSummaryProvider);
     final currentUser = ref.watch(authControllerProvider).valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Panel'),
+        title: Text(strings.text('dashboard')),
         actions: [
           IconButton(
             icon: const Icon(Icons.mail_outline),
@@ -31,11 +33,19 @@ class DashboardPage extends ConsumerWidget {
             icon: const Icon(Icons.logout),
             onPressed: () => ref.read(authControllerProvider.notifier).logout(),
           ),
+          PopupMenuButton<String>(
+            tooltip: strings.text('language'),
+            onSelected: strings.setLanguage,
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'tr', child: Text(strings.text('turkish'))),
+              PopupMenuItem(value: 'en', child: Text(strings.text('english'))),
+            ],
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/events'),
-        label: const Text('Etkinlikler'),
+        label: Text(strings.text('events')),
         icon: const Icon(Icons.event),
       ),
       body: RefreshIndicator(
@@ -52,7 +62,7 @@ class DashboardPage extends ConsumerWidget {
               Center(
                 child: FilledButton(
                   onPressed: () => ref.invalidate(eventSummaryProvider),
-                  child: const Text('Tekrar dene'),
+                  child: Text(strings.text('retry')),
                 ),
               ),
             ],
@@ -71,6 +81,7 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final dateFormat = DateFormat('d MMM, HH:mm');
 
     return ListView(
@@ -94,9 +105,9 @@ class _DashboardBody extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        Text('Yaklasan Etkinlikler', style: Theme.of(context).textTheme.titleMedium),
+        Text(strings.text('upcoming'), style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        if (summary.upcomingEvents.isEmpty) const Text('Yaklasan etkinlik yok.'),
+        if (summary.upcomingEvents.isEmpty) Text(strings.text('noUpcoming')),
         ...summary.upcomingEvents.map((event) => Card(
               child: ListTile(
                 title: Text(event.title),

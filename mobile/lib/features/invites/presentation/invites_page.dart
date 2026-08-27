@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../events/application/events_providers.dart';
 import '../../events/models/event_models.dart';
+import '../../../core/localization/app_localizations.dart';
 
 final invitesPageProvider = FutureProvider.autoDispose<List<EventListItem>>((ref) async => ref.read(eventsRepositoryProvider).getAll());
 
@@ -14,7 +15,8 @@ class InvitesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).valueOrNull;
-    return Scaffold(appBar: AppBar(title: const Text('Davetler')), body: ref.watch(invitesPageProvider).when(
+    final strings = AppLocalizations.of(context);
+    return Scaffold(appBar: AppBar(title: Text(strings.text('invites'))), body: ref.watch(invitesPageProvider).when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text(error.toString())),
       data: (events) {
