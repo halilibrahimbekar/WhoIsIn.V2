@@ -42,6 +42,23 @@ Durumlar:
 | M1-15 | Organizer dashboard gercek metrikleri | DONE | Organizer summary endpointi ile active events, accepted, waitlist, fill rate ve upcoming events gercek veriden geliyor |
 | M1-16 | MVP bildirim akislarinin tasarlanmasi | TODO | Invite, RSVP ve event update/iptal bildirimleri icin kanal ve teslim modeli netlestirilmeli |
 
+## MVP Ozellik TODO Listesi
+
+`PROJECT_PLAN.md` icindeki MVP kapsaminda, mevcut milestone'lara ek olarak izlenmesi gereken urun isleri:
+
+| ID | MVP ozelligi | Durum | Yapilacaklar |
+|---|---|---|---|
+| MVP-01 | Co-Organizer rol ve yetkileri | TODO | Rol modelini ve JWT claim'lerini genislet; event bazli co-organizer atama, goruntuleme ve yonetim izinlerini ekle |
+| MVP-02 | Tarih/saat ve timezone yonetimi | TODO | Event olusturma/guncellemede timezone kabul et; UTC saklama, kullaniciya yerel saat gosterimi ve DST kurallarini netlestir |
+| MVP-03 | Fiziksel veya online konum | TODO | Konum tipini, fiziksel adres alanlarini ve online meeting URL'sini domain/API/web formlarinda destekle |
+| MVP-04 | Paylasilabilir davet linki | TODO | Guvenli ve iptal edilebilir invite token uret; link ile davetli kaydi/RSVP akislarini ve web ekranini ekle |
+| MVP-05 | Kapasite ve waitlist otomasyonu | TODO | Kabul sirasinda atomik kapasite kontrolu yap; kapasite dolunca otomatik Waitlisted ata, bosalan kontenjan icin promote akisina bagla |
+| MVP-06 | Organizatör katilimci yonetimi | TODO | Onayli katilimci ve waitlist kuyrugunu filtreli/aranabilir goster; manuel status degisikligi ve kuyruk sirasini UI'da tamamla |
+| MVP-07 | Son aktivite zaman cizelgesi | TODO | Invite, RSVP, status ve participant degisikliklerini kaydet; organizer dashboard'da temel activity timeline endpointi ve gorunumu ekle |
+| MVP-08 | Davet bildirimleri | TODO | Invite olusturma olayini notification kaydina ve secilen teslim kanalina bagla; teslim/hatayi izlenebilir kil |
+| MVP-09 | RSVP durum bildirimleri | TODO | Accept, Decline ve Waitlisted degisikliklerinde davetliye ve gerekiyorsa organizatore bildirim gonder |
+| MVP-10 | Event guncelleme/iptal bildirimleri | TODO | Event update ve Cancelled gecislerinde etkilenen davetli/katilimcilari bulup bildirim akisina bagla |
+
 ## Uygulama Sirasi ve Bitirme Kriterleri
 
 Asagidaki sira, API guvenligi ve veri kontratlari oturmadan web ekranlarinin tekrar tekrar degismemesi icin secildi:
